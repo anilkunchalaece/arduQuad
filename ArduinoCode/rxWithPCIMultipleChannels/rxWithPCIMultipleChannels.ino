@@ -30,7 +30,11 @@ unsigned long pwmEnd[4];
 
 //pinDeclaration for Rx
 const byte rxCh[] = {8,9,10,11};
+const byte noOfChannels = sizeof(rxCh);
 
+//portStatus
+const byte prevPortState[] = {1,1,1,1};
+const byte presentPortState[4];
 
 //Interrupt Service Routine will fire when for PinChange in PortB
 ISR(PCINT0_vect){
@@ -48,23 +52,29 @@ Serial.begin(9600);
 Serial.println("DEBUG mode Enabled");
 #endif
 
-for (int ch=0 ; ch < sizeof(rxCh)-1; ch++){
+for (int ch=0 ; ch < noOfChannels; ch++){
   pinMode(rxCh[ch],INPUT_PULLUP);//make pin input with pullup enabled
-}
+}//end of for loop
 
-}
+}//end os setup
 
 void loop() {
   if(recvPCInt == true){
-     boolean event = digitalRead(9);
-//     if(event == HIGH)
-//        {
-//          pwmStart = micros();
-//        }
-//       else if(event == LOW){
-//          pwmEnd = micros();
-//        Serial.println(pwmEnd-pwmStart);
-//       }
-     recvPCInt = false;
+  for (int ch=0; ch < noOfChannels; ch++){
+    boolean event = digitalRead(rxCh[ch]);
+    if(event == HIGH){
+      pwmStart[ch] = micros();
+    }else if(event == LOW){
+      pwmEnd[ch] = micros();
+      pwmDuration[ch] = pwmEnd[ch] - pwmStart[ch];
+      #ifdef DEBUG
+      Serial.print("pwm duration for channel ");
+      Serial.print(ch);
+      Serial.print(" ");
+      Serial.println(pwmDuration[ch]);
+      #endif 
+    }//end of ifElseif
+    }//end of for loop
+    recvPCInt = false;
   }
 }
