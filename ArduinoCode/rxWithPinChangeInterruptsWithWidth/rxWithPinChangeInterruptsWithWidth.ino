@@ -1,4 +1,12 @@
-//   Pin Change Interrupts
+ /*
+ * Author : Kunchala Anil
+ * email : anilkunchalaece@gmail.com
+ * Date : 01 Mar 2018
+ * 
+ * Pin Change Interrupts - Single Rx Channel i.e Single PWM Wave
+ * 
+ */
+
 //PCMSKx - Pin Change Mask Register
 //PCMSK0 - portB (D8-D13) (PCINT0  - PCINT6)
 //PCMSK1 - portC (A0-A5)  (PCINT8  - PCINT14)
