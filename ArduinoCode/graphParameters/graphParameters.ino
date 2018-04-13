@@ -7,6 +7,8 @@
   Basic lift with PID of KSRM Quad
 
 
+*/
+/*
    Connect Channel 3 to pin 10 i.e PCINT2
    Arm the all the Motors
    use Servo Write to Send the control signal to ESC
@@ -18,32 +20,6 @@
         Pulse width when Throttle at Maximum Posistion is : 1800
 
         we need to map value from 1200-1800 to 60 to 130
-
- *    
- *    Motor Directions For Quad + Configuration 
- *    
- *    m0 Front - CW
- *    m1 Right - CCW
- *    m2 Back - CW
- *    m3 Left - CCW
-
-      MPU6050 Connections 
-      SCL - A5
-      SDA - A4
-      INT - 2
-
-     HC-05 Connections
-      TX - A0
-      RX - A1
-
-     Motor Connections
-      mo - 4 Front Motor
-      m1 - 5 Right Motor
-      m2 - 6 Rear Motor
-      m3 - 7 Left Motor
-
-      Rx Connections
-      ch3 - 10 Throttle
 */
 
 
@@ -65,17 +41,15 @@
 #include <helper_3dmath.h>
 #include <MPU6050_6Axis_MotionApps20.h>
 
-
-#include <SoftwareSerial.h> //Software Serial Library for HC-05 Bluetooth Module - this module act as a Slave and sends the data to the master or receive the data from master
-SoftwareSerial BTSerial(A0,A1); // TX, RX
-
-#define DEBUG
+#define rxPin 10
+//#define DEBUG
 
 //MotorConnections
-#define m0 4
-#define m1 5
-#define m2 6
-#define m3 7
+
+#define frontLeftMotorPin 4
+#define frontRightMotorPin 5
+#define backLeftMotorPin 6
+#define backRightMotorPin 7
 
 // Date : 20Mar - Changing the Motor value from Angle(i.e servo.write) to microSeconds(servo.writeMicroSeconds)
 #define motorArmValue 1152 // 60
@@ -87,54 +61,52 @@ SoftwareSerial BTSerial(A0,A1); // TX, RX
 #define throttleMaxValue 1800
 
 //PID Constants
+#define pitchPVal 2
+#define pitchDVal 0
+#define pitchIVal 0
 
-/*
-  * 13 Apr 2018 
-  * Changed #defined to float to change pid parameters using bluetooth
-*/
-float pitchPVal 0.5
-float pitchDVal 0
-float pitchIVal 0
-
-#define rollPVal 0
+#define rollPVal 2
 #define rollDVal 0
 #define rollIVal 0
 
-#define yawPVal 0
+#define yawPVal 2
 #define yawDVal 0
 #define yawIVal 0
 
 
 //Flight Parameters
-#define pitchMin -90
-#define pitchMax 90
-#define rollMin -90
-#define rollMax 90
+#define pitchMin -30
+#define pitchMax 30
+#define rollMin -30
+#define rollMax 30
 #define yawMin -180
 #define yawMax 180
 
-
-//#define pidPitchInfluence 20
-//#define pidRollInfluence 20
-//#define pidYawInfluence 20
+#define pidPitchInfluence 20
+#define pidRollInfluence 20
+#define pidYawInfluence 20
 
 
 //MPU 6050 Offsets
-#define mpuGyroXOffset 98
-#define mpuGyroYOffset 20
-#define mpuGyroZOffset 34
+#define mpuGyroXOffset 97
+#define mpuGyroYOffset 23
+#define mpuGyroZOffset 23
 
-#define mpuAccelXOffset -1034
-#define mpuAccelYOffset -571
-#define mpuAccelZOffset 884
+#define mpuAccelXOffset -1025
+#define mpuAccelYOffset -646
+#define mpuAccelZOffset 886
 
+int frontLeftMotorValue;
+int frontRightMotorValue;
+int backLeftMotorValue;
+int backRightMotorValue;
 
 volatile boolean recvPCInt = false;
 
-Servo motor0;
-Servo motor1;
-Servo motor2;
-Servo motor3;
+Servo frontLeftMotor;
+Servo frontRightMotor;
+Servo backLeftMotor;
+Servo backRightMotor;
 
 //-------------------------------------------------------------------
 //MPU variables
@@ -210,58 +182,46 @@ void updateMotors() {
 
   int width = pwmDuration[2];
 
-  if (width < 1200 ) {
+  if (width < 1300 ) {
 #ifdef DEBUG
-    Serial.print("received signal width");
-    Serial.println(width);
     Serial.println("not updating motors");
 #endif
-    motor0.write(motorArmValue);
-    motor1.write(motorArmValue);
-    motor2.write(motorArmValue);
-    motor3.write(motorArmValue);
+    frontLeftMotor.write(motorArmValue);
+    frontRightMotor.write(motorArmValue);
+    backLeftMotor.write(motorArmValue);
+    backRightMotor.write(motorArmValue);
 
 
   }
   else
   {
-    int throttle = map(width, throttleMinValue, throttleMaxValue, motorMinValue, motorMaxValue);
+    int val = map(width, throttleMinValue, throttleMaxValue, motorMinValue, motorMaxValue);
     #ifdef DEBUG
     Serial.print("received val is ");
-    Serial.println(throttle);
+    Serial.println(val);
     #endif
-     int m0Value = throttle - pidPitchOut; //- pidYawOut;
-     int m1Value = throttle - pidRollOut; //+ pidYawOut;
-     int m2Value = throttle + pidPitchOut; //- pidYawOut;
-     int m3Value = throttle + pidRollOut; //+ pidYawOut;
+    frontLeftMotorValue = val - pidPitchOut + pidRollOut ;//+ pidYawOut;
+    frontRightMotorValue = val - pidPitchOut - pidRollOut;// - pidYawOut;
+    backLeftMotorValue = val + pidPitchOut + pidRollOut;// - pidYawOut;
+    backRightMotorValue = val + pidPitchOut - pidRollOut;// + pidYawOut;
 
-    BTSerial.print("<");
-    BTSerial.print(m0Value);
-    BTSerial.print(",");
-    BTSerial.print(m1Value);
-    BTSerial.print(",");
-    BTSerial.print(m2Value);
-    BTSerial.print(",");
-    BTSerial.print(m3Value);
-    BTSerial.print(",");
-    BTSerial.print(pidYawIn);
-    BTSerial.print(",");
-    BTSerial.print(pidPitchIn);
-    BTSerial.print(",");
-    BTSerial.print(pidRollIn);
-    BTSerial.print(",");
-    BTSerial.print(pidPitchOut);
-    BTSerial.print(",");
-    BTSerial.print(pidRollOut);
-    BTSerial.println(">");
-
-    motor0.write(m0Value);
-    motor1.write(m1Value);
-    motor2.write(m2Value);
-    motor3.write(m3Value);
+#ifdef DEBUG
+    Serial.print("fl,fr,bl,br\t");
+    Serial.print(frontLeftMotorValue);
+    Serial.print("\t");
+    Serial.print(frontRightMotorValue);
+    Serial.print("\t");
+    Serial.print(backLeftMotorValue);
+    Serial.print("\t");
+    Serial.println(backRightMotorValue);
+#endif
+    frontLeftMotor.write(frontLeftMotorValue);
+    frontRightMotor.write(frontRightMotorValue);
+    backLeftMotor.write(backLeftMotorValue);
+    backRightMotor.write(backRightMotorValue);
 #ifdef DEBUG
     Serial.print("motors are updated with value => ");
-    Serial.println(throttle);
+    Serial.println(val);
 #endif
 
   }//end of ifElse
@@ -269,10 +229,10 @@ void updateMotors() {
 
 
 void initializeMotors() {
-  motor0.attach(m0);
-  motor1.attach(m1);
-  motor2.attach(m2);
-  motor3.attach(m3);
+  frontLeftMotor.attach(frontLeftMotorPin);
+  frontRightMotor.attach(frontRightMotorPin);
+  backLeftMotor.attach(backLeftMotorPin);
+  backRightMotor.attach(backRightMotorPin);
 #ifdef DEBUG
   Serial.println("motors initialized");
 #endif
@@ -280,10 +240,10 @@ void initializeMotors() {
 
 
 void armAllMotors() {
-  motor0.write(motorArmValue);
-  motor1.write(motorArmValue);
-  motor2.write(motorArmValue);
-  motor3.write(motorArmValue);
+  frontLeftMotor.write(motorArmValue);
+  frontRightMotor.write(motorArmValue);
+  backLeftMotor.write(motorArmValue);
+  backRightMotor.write(motorArmValue);
   delay(motorArmDelay);
 #ifdef DEBUG
   Serial.println("motors are Armed ");
@@ -348,9 +308,9 @@ void updateAnglesFromMPU() {
 }//end of getAnglesFromMPU
 
 void initPID() {
-  rollController.SetOutputLimits(rollMin, rollMax);
-  pitchController.SetOutputLimits(pitchMin, pitchMax);
-  yawController.SetOutputLimits(yawMin, yawMax);
+//  rollController.SetOutputLimits(rollMin, rollMax);
+//  pitchController.SetOutputLimits(pitchMin, pitchMax);
+//  yawController.SetOutputLimits(yawMin, yawMax);
   rollController.SetMode(AUTOMATIC);
   pitchController.SetMode(AUTOMATIC);
   yawController.SetMode(AUTOMATIC);
@@ -367,7 +327,6 @@ void computePID() {
   pidYawIn = ypr[0]*180/M_PI; //Converts Radians to degrees ref - https://forum.arduino.cc/index.php?topic=446713.msg3078076#msg3078076
   pidPitchIn = ypr[2]*180/M_PI; //Changed 1 to 2 Due to some problem in Orientation or sensor ? NEED TO FIX IT
   pidRollIn = ypr[1]*180/M_PI;
-  
   #ifdef DEBUG
     Serial.print("y p r ");
     Serial.print(pidYawIn);
@@ -382,21 +341,35 @@ void computePID() {
 }//end of computePID
 
 
-void checkForBTInput(){
-  
-}//end of checkForBTInput
+void sendDataToPython(){
+  Serial.print("<");
+  Serial.print(pidYawIn);
+  Serial.print(",");
+  Serial.print(pidPitchIn);
+  Serial.print(",");
+  Serial.print(pidRollIn);
+  Serial.print(",");
+  Serial.print(frontLeftMotorValue);
+  Serial.print(",");
+  Serial.print(frontRightMotorValue);
+  Serial.print(",");
+  Serial.print(backLeftMotorValue);
+  Serial.print(",");
+  Serial.print(backRightMotorValue);
+  Serial.println(">");
+}//end of sendDataToPython
+
 
 void setup() {
   cli(); //Clear all interrupts
   PCICR |= 1 << PCIE0; //Enable port B Registers i.e D8-D13
-  PCMSK0 |= 1 << PCINT2;// Pin10
+  PCMSK0 |= 1 << PCINT2;// Pin9
   sei(); //enable all interrupts
   pinMode(10, INPUT);
   digitalWrite(10, HIGH); //enable pull up in pin
 //#ifdef DEBUG
   Serial.begin(115200);
 //#endif
-  BTSerial.begin(38400); // HC-05 Default baudrate
   initializeMotors();
   armAllMotors();
   initMPU();
@@ -413,6 +386,6 @@ void loop() {
   updateAnglesFromMPU();
   computePID();
   updateMotors();
-  checkForBTInput();
+  sendDataToPython();
 }//end of loop
 

@@ -1,7 +1,7 @@
 
 #include <SoftwareSerial.h>
 
-SoftwareSerial BTSerial(3,4); // RX, TX
+SoftwareSerial BTSerial(3,4); // TX, RX
 
 void setup() {
 Serial.begin(9600);

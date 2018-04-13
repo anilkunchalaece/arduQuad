@@ -23,7 +23,7 @@ Servo myServo;
 int recvValue = 0;
 void setup() {
   Serial.begin(9600);
-  myServo.attach(3);
+  myServo.attach(7);
 }
 
 void loop() {

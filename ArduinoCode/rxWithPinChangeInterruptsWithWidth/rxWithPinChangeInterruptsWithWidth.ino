@@ -16,6 +16,8 @@
 //  PCIE1 - Pin Change Interrupt Enable 1 - Port C (A0-A5)
 //  PCIE2 - Pin Change Interrupt Enable 2 - Port D (D0-D7)
 
+#define rxPin 10
+
 volatile boolean recvPCInt = false;
 volatile byte portValue;
 unsigned long pwmDuration;
@@ -32,16 +34,16 @@ ISR(PCINT0_vect){
 void setup() {
 cli(); //Clear all interrupts
 PCICR |= 1 << PCIE0; //Enable port B Registers i.e D8-D13
-PCMSK0 |= 1 << PCINT1;// Pin9
+PCMSK0 |= 1 << PCINT2;// Pin10
 sei(); //enable all interrupts
-pinMode(9,INPUT);
-digitalWrite(9,HIGH);//enable pull up in pin 9
+pinMode(rxPin,INPUT);
+digitalWrite(rxPin,HIGH);//enable pull up in pin 9
 Serial.begin(9600);
 }
 
 void loop() {
   if(recvPCInt == true){
-     boolean event = digitalRead(9);
+     boolean event = digitalRead(rxPin);
      if(event == HIGH)
         {
           pwmStart = micros();
