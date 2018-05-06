@@ -1,7 +1,7 @@
 
 #include <SoftwareSerial.h>
 
-SoftwareSerial BTSerial(3,4); // TX, RX
+SoftwareSerial BTSerial(A1,A0); // TX, RX
 
 void setup() {
 Serial.begin(9600);
@@ -12,9 +12,12 @@ BTSerial.begin(38400); //HC-5 Default Speed in AT Mode
 
 void loop(){
  
-  if(BTSerial.available()){
-    Serial.write(BTSerial.read());
-  }
-  
+//  if(BTSerial.available()){
+//    Serial.write(BTSerial.read());
+//  }
+//  
+
+BTSerial.write("HI");
+delay(500);
 }
 

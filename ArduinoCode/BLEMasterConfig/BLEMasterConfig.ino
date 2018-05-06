@@ -1,4 +1,9 @@
 /*
+ * Author : Kunchala Anil
+ * Email : anilkunchalaece@gmail.com
+ * Date : 13 Apr 2018
+ * This sketch is used to Configure HC-05 Modules as Slave and Master
+ *
  * Configuring the HC-05 Bluetooth Module as Master
  * Connection To Arduino 
  *  HC-05 GND --- Arduino GND Pin
@@ -71,4 +76,5 @@ void loop(){
   }
   
 }
+
 
