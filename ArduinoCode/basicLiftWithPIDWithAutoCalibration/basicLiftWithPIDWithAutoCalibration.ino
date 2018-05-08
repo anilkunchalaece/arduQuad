@@ -90,7 +90,7 @@ int index = 0;
 float pp,pd,pi,rp,rd,ri,yp,yd,yi; //pid constants for pitch,roll,yaw
 
 unsigned long btDataStartMillis = millis();
-#define DATA_INTERVAL 100
+#define DATA_INTERVAL 150
 #endif
 
 //MotorConnections
