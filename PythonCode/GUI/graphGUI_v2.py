@@ -30,7 +30,10 @@ m1Val = [] # Right
 m2Val = [] # Rear
 m3Val = [] # Left
 
-
+x1 = []
+x2 = []
+x3 = []
+x4 = []
 
 #Always start by initializing Qt
 app = QtGui.QApplication([])
@@ -49,6 +52,39 @@ yawPlot = pg.PlotWidget()
 instantData = QtGui.QWidget()
 motorPlot = pg.PlotWidget()
 pidData = QtGui.QWidget()
+
+
+pitchPlot.addLegend()
+pitchPlotPlt = pitchPlot.plot(x1,pitchVal,clear=True,pen=(1,2),name="Pitch")
+#ref : https://stackoverflow.com/questions/48590354/pyqtgraph-plotwidget-multiple-y-axis-plots-in-wrong-area?
+#pitchPlot.addItem(pg.PlotCurveItem(x1,pitchSetPoint,clear=True,pen=(2,2),name="Pitch setPoints"))
+pitchPlotPlt2 = pg.PlotCurveItem(x1,pitchSetPoint,clear=True,pen=(2,2),name="Pitch setPoints")
+pitchPlot.addItem(pitchPlotPlt2)
+pitchPlot.setYRange(-32,32)
+
+rollPlot.addLegend()
+rollPlotPlt = rollPlot.plot(x2,rollVal,clear=True,pen=(1,2),name="Roll")
+rollPlotPlt2 = pg.PlotCurveItem(x2,rollSetPoint,clear=True,pen=(2,2),name="Roll setPoint")
+rollPlot.addItem(rollPlotPlt2)
+rollPlot.setYRange(-32,32)
+
+yawPlot.addLegend()
+yawPlotPlt = yawPlot.plot(x4,yawVal,clear=True,pen=(1,2),name="Yaw")
+yawPlotPlt2 = pg.PlotCurveItem(x4,yawSetpoint,clear=True,pen=(2,2),name="Yaw setPoint")
+yawPlot.addItem(yawPlotPlt2)
+yawPlot.setYRange(-32,32)
+
+motorPlot.addLegend()
+motorPlotPlt = motorPlot.plot(x3,m0Val,clear=True,pen=(1,4),name="Front")
+motorPlotPlt2 = pg.PlotCurveItem(x3,m1Val,clear=True,pen=(2,4),name="Right")
+motorPlot.addItem(motorPlotPlt2)
+motorPlotPlt3 = pg.PlotCurveItem(x3,m2Val,clear=True,pen=(3,4),name="Rear")
+motorPlot.addItem(motorPlotPlt3)
+motorPlotPlt4 = pg.PlotCurveItem(x3,m3Val,clear=True,pen=(4,4),name="Left")
+motorPlot.addItem(motorPlotPlt4)
+
+#pitchPlotPlt = pitchPlot.plot(x1,pitchVal,clear=True,pen=(1,2),name="Pitch")
+
 
 credits = QtGui.QLabel("KSRM ArduQuad Parameter Monitor By Kunchala Anil")
 
@@ -184,38 +220,48 @@ w.show()
 timer = pg.QtCore.QTimer()
 
 
+
 def update():
     	checkData()
         x1 = np.arange(len(pitchVal))
-        pitchPlot.addLegend()
-        pitchPlot.plot(x1,pitchVal,clear=True,pen=(1,2),name="Pitch")
-		#ref : https://stackoverflow.com/questions/48590354/pyqtgraph-plotwidget-multiple-y-axis-plots-in-wrong-area?
-        pitchPlot.addItem(pg.PlotCurveItem(x1,pitchSetPoint,clear=True,pen=(2,2),name="Pitch setPoints"))
-        pitchPlot.setYRange(-32,32)
+        pitchPlotPlt.setData(x=x1,y=pitchVal)
+        pitchPlotPlt2.setData(x=x1,y=pitchSetPoint)
+        # pitchPlot.addLegend()
+        # pitchPlot.plot(x1,pitchVal,clear=True,pen=(1,2),name="Pitch")
+		# #ref : https://stackoverflow.com/questions/48590354/pyqtgraph-plotwidget-multiple-y-axis-plots-in-wrong-area?
+        # pitchPlot.addItem(pg.PlotCurveItem(x1,pitchSetPoint,clear=True,pen=(2,2),name="Pitch setPoints"))
+        # pitchPlot.setYRange(-32,32)
 
         x2 = np.arange(len(rollVal))
-        rollPlot.addLegend()
-        rollPlot.plot(x2,rollVal,clear=True,pen=(1,2),name="Roll")
-        rollPlot.addItem(pg.PlotCurveItem(x2,rollSetPoint,clear=True,pen=(2,2),name="Roll setPoint"))
-        rollPlot.setYRange(-32,32)
+        rollPlotPlt.setData(x=x2,y=rollVal)
+        rollPlotPlt2.setData(x=x2,y=rollSetPoint)        
+        # rollPlot.addLegend()
+        # rollPlot.plot(x2,rollVal,clear=True,pen=(1,2),name="Roll")
+        # rollPlot.addItem(pg.PlotCurveItem(x2,rollSetPoint,clear=True,pen=(2,2),name="Roll setPoint"))
+        # rollPlot.setYRange(-32,32)
 
         x4 = np.arange(len(yawVal))
-        yawPlot.addLegend()
-        yawPlot.plot(x4,yawVal,clear=True,pen=(1,2),name="Yaw")
-        yawPlot.addItem(pg.PlotCurveItem(x4,yawSetpoint,clear=True,pen=(2,2),name="Yaw setPoint"))
-        yawPlot.setYRange(-32,32)
+        yawPlotPlt.setData(x=x4,y=yawVal)
+        yawPlotPlt2.setData(x=x4,y=yawSetpoint)
+        # yawPlot.addLegend()
+        # yawPlot.plot(x4,yawVal,clear=True,pen=(1,2),name="Yaw")
+        # yawPlot.addItem(pg.PlotCurveItem(x4,yawSetpoint,clear=True,pen=(2,2),name="Yaw setPoint"))
+        # yawPlot.setYRange(-32,32)
 
         x3 = np.arange(len(m0Val))
-        motorPlot.addLegend()
-        motorPlot.plot(x3,m0Val,clear=True,pen=(1,4),name="Front")
-        motorPlot.addItem(pg.PlotCurveItem(x3,m1Val,clear=True,pen=(2,4),name="Right"))
-        motorPlot.addItem(pg.PlotCurveItem(x3,m2Val,clear=True,pen=(3,4),name="Rear"))
-        motorPlot.addItem(pg.PlotCurveItem(x3,m3Val,clear=True,pen=(4,4),name="Left"))
+        motorPlotPlt.setData(x=x3,y=m0Val)
+        motorPlotPlt2.setData(x=x3,y=m1Val)
+        motorPlotPlt3.setData(x=x3,y=m2Val)
+        motorPlotPlt4.setData(x=x3,y=m3Val)
+        # motorPlot.addLegend()
+        # motorPlot.plot(x3,m0Val,clear=True,pen=(1,4),name="Front")
+        # motorPlot.addItem(pg.PlotCurveItem(x3,m1Val,clear=True,pen=(2,4),name="Right"))
+        # motorPlot.addItem(pg.PlotCurveItem(x3,m2Val,clear=True,pen=(3,4),name="Rear"))
+        # motorPlot.addItem(pg.PlotCurveItem(x3,m3Val,clear=True,pen=(4,4),name="Left"))
 #        motorPlot.setYRange(1200,1800)
 
-
 timer.timeout.connect(update)
-timer.start(100)
+timer.start(50)
 
 def checkForReadings(data):
     y = re.findall(r"y([-+]?\d*\.\d+|\d+)",data)
@@ -256,7 +302,7 @@ def checkForReadings(data):
     if len(y) > 0 and len(ys) > 0:
         yawInstLable.setText('Yaw --> '+y[0])
         yawSetPointInstLable.setText('Yaw SetPoint --> '+ys[0])
-        yawVal.append(float(r[0]))
+        yawVal.append(float(y[0]))
         yawSetpoint.append(float(ys[0]))
         while len(yawVal) > 100 :
             yawVal.pop(0)
