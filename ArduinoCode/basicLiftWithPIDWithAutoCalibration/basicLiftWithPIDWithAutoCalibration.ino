@@ -90,7 +90,7 @@ int index = 0;
 float pp, pd, pi, rp, rd, ri, yp, yd, yi; //pid constants for pitch,roll,yaw
 
 unsigned long btDataStartMillis = millis();
-#define DATA_INTERVAL 150
+#define DATA_INTERVAL 200
 #endif
 
 //MotorConnections
@@ -128,10 +128,10 @@ unsigned long btDataStartMillis = millis();
 
 
 //Flight Parameters
-#define pitchMin -90
-#define pitchMax 90
-#define rollMin -90
-#define rollMax 90
+#define pitchMin -30
+#define pitchMax 30
+#define rollMin -30
+#define rollMax 30
 #define yawMin -90
 #define yawMax 90
 
@@ -565,10 +565,14 @@ void sendBTOutput() {
     Serial.print(pidPitchSetPoint);
     Serial.print(F("rs"));
     Serial.print(pidRollSetPoint);
+    Serial.print(F("ys"));
+    Serial.print(pidYawSetPoint);
     Serial.print(F("po"));
     Serial.print(pidPitchOut);
     Serial.print(F("ro"));
     Serial.print(pidRollOut);
+    Serial.print(F("yo"));
+    Serial.print(pidYawOut);
     Serial.print(F("m0-"));
     Serial.print(m0Value);
     Serial.print(F("m1-"));
@@ -576,7 +580,13 @@ void sendBTOutput() {
     Serial.print(F("m2-"));
     Serial.print(m2Value);
     Serial.print(F("m3-"));
-    Serial.println(m3Value);
+    Serial.print(m3Value);
+    Serial.print(F("c0"));
+    Serial.print(pwmDuration[0]);
+    Serial.print(F("c1"));
+    Serial.print(pwmDuration[1]);
+    Serial.print(F("c2"));
+    Serial.println(pwmDuration[2]);
   }//end of IF
 }//end of sendBTOutput Fcn
 
