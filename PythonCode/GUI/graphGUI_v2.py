@@ -91,7 +91,7 @@ credits = QtGui.QLabel("KSRM ArduQuad Parameter Monitor By Kunchala Anil")
 ##Create a grid layout to manage the widgets size and position
 layout = QtGui.QGridLayout()
 w.setLayout(layout)
-w.setWindowTitle("KSRMQuad Monitor By Kunchala Anil")
+w.setWindowTitle("KSRMQuad Monitor")
 
 # add widgets to layout in their proper postion
 #layout.addWidget(btn,0,0)
@@ -117,7 +117,7 @@ yawPIDOutInstLable = QtGui.QLabel("Yaw PID Out")
 
 rollSetPointInstLable = QtGui.QLabel("Roll SetPoint")
 pitchSetPointInstLable = QtGui.QLabel("Pitch SetPoint")
-yawSetPointInstLable = QtGui.QLabel("Yaw SetPoint")
+#yawSetPointInstLable = QtGui.QLabel("Yaw SetPoint")
 
 frontMotorInstLable = QtGui.QLabel("Front")
 rightMotorInstLable = QtGui.QLabel("Right")
@@ -149,7 +149,7 @@ instLayout.addWidget(leftMotorInstLable,3,1)
 instLayout.addWidget(ch1InstLable,4,1)
 instLayout.addWidget(ch2InstLable,5,1)
 instLayout.addWidget(ch3InstLable,6,1)
-instLayout.addWidget(yawSetPointInstLable,7,1)
+instLayout.addWidget(ch4InstLable,7,1)
 
 ##Create a layout for the pidData
 pidDataLayout = QtGui.QGridLayout()
@@ -261,26 +261,27 @@ def update():
 #        motorPlot.setYRange(1200,1800)
 
 timer.timeout.connect(update)
-timer.start(50)
+timer.start(200)
 
 def checkForReadings(data):
-    y = re.findall(r"y([-+]?\d*\.\d+|\d+)",data)
-    p = re.findall(r"p([-+]?\d*\.\d+|\d+)",data)
-    r = re.findall(r"r([-+]?\d*\.\d+|\d+)",data)
-    ps = re.findall(r"ps([-+]?\d*\.\d+|\d+)",data)
-    rs = re.findall(r"rs([-+]?\d*\.\d+|\d+)",data)
-    ys = re.findall(r"ys([-+]?\d*\.\d+|\d+)",data)
-    po = re.findall(r"po([-+]?\d*\.\d+|\d+)",data)
-    ro = re.findall(r"ro([-+]?\d*\.\d+|\d+)",data)
-    yo = re.findall(r"yo([-+]?\d*\.\d+|\d+)",data)    
-    m0 = re.findall(r"m0-([-+]?\d*\.\d+|\d+)",data)
-    m1 = re.findall(r"m1-([-+]?\d*\.\d+|\d+)",data)
-    m2 = re.findall(r"m2-([-+]?\d*\.\d+|\d+)",data)
-    m3 = re.findall(r"m3-([-+]?\d*\.\d+|\d+)",data)
-    rr = re.findall(r"c0([-+]?\d*\.\d+|\d+)",data)
-    rp = re.findall(r"c1([-+]?\d*\.\d+|\d+)",data)
-    rt = re.findall(r"c2([-+]?\d*\.\d+|\d+)",data)
-    
+    y = re.findall(r"y([-+]?\d*\.\d+|\d+)>",data)
+    p = re.findall(r"p([-+]?\d*\.\d+|\d+)>",data)
+    r = re.findall(r"r([-+]?\d*\.\d+|\d+)>",data)
+    ps = re.findall(r"ps([-+]?\d*\.\d+|\d+)>",data)
+    rs = re.findall(r"rs([-+]?\d*\.\d+|\d+)>",data)
+    ys = re.findall(r"ys([-+]?\d*\.\d+|\d+)>",data)
+    po = re.findall(r"po([-+]?\d*\.\d+|\d+)>",data)
+    ro = re.findall(r"ro([-+]?\d*\.\d+|\d+)>",data)
+    yo = re.findall(r"yo([-+]?\d*\.\d+|\d+)>",data)    
+    m0 = re.findall(r"m0-([-+]?\d*\.\d+|\d+)>",data)
+    m1 = re.findall(r"m1-([-+]?\d*\.\d+|\d+)>",data)
+    m2 = re.findall(r"m2-([-+]?\d*\.\d+|\d+)>",data)
+    m3 = re.findall(r"m3-([-+]?\d*\.\d+|\d+)>",data)
+    rr = re.findall(r"c0([-+]?\d*\.\d+|\d+)>",data)
+    rp = re.findall(r"c1([-+]?\d*\.\d+|\d+)>",data)
+    rt = re.findall(r"c2([-+]?\d*\.\d+|\d+)>",data)
+    ry = re.findall(r"c3([-+]?\d*\.\d+|\d+)>",data)
+
     if len(p) > 0 and len(ps) > 0:
     	pitchVal.append(float(p[0]))
         pitchSetPoint.append(float(ps[0]))
@@ -301,7 +302,7 @@ def checkForReadings(data):
     
     if len(y) > 0 and len(ys) > 0:
         yawInstLable.setText('Yaw --> '+y[0])
-        yawSetPointInstLable.setText('Yaw SetPoint --> '+ys[0])
+        #yawSetPointInstLable.setText('Yaw SetPoint --> '+ys[0])
         yawVal.append(float(y[0]))
         yawSetpoint.append(float(ys[0]))
         while len(yawVal) > 100 :
@@ -329,13 +330,15 @@ def checkForReadings(data):
         ch2InstLable.setText('CH2 --> '+rp[0])
     if len(rt) > 0 :
         ch3InstLable.setText('CH3 --> '+rt[0])
+    if len(ry) > 0 :
+        ch4InstLable.setText('CH4 --> '+ry[0])
     if len(po) > 0 :
         pitchPIDOutInstLable.setText('Pitch PID Out --> '+po[0])
     if len(ro) > 0 :
         rollPIDOutInstLable.setText('Roll PID Out --> '+ro[0])
     if len(yo) > 0:
         yawPIDOutInstLable.setText('Yaw PID Out --> '+yo[0])
-    # print [y,p,r,ps,rs,po,ro,m0,m1,m2,m3]
+    print [y,p,r,ps,rs,po,ro,m0,m1,m2,m3]
 
 def checkData():
     # print "check data"
