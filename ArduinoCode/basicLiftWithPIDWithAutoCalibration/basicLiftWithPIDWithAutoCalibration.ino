@@ -104,7 +104,7 @@ unsigned long btDataStartMillis = millis();
 #define m3 7
 
 // Date : 20Mar - Changing the Motor value from Angle(i.e servo.write) to microSeconds(servo.writeMicroSeconds)
-#define motorArmValue 1152 // 60
+#define motorArmValue 1200 // 60
 #define motorMinValue 1200 //65
 #define motorMaxValue 1800 //130
 #define motorArmDelay 2000 //wait after motors armed
@@ -163,6 +163,7 @@ unsigned long btDataStartMillis = millis();
 
 volatile boolean recvPCInt = false;
 volatile boolean armMotors = false;
+boolean motorsArmed = false;
 
 Servo motor0;
 Servo motor1;
@@ -335,10 +336,18 @@ void armAllMotors() {
   motor2.write(motorArmValue);
   motor3.write(motorArmValue);
   delay(motorArmDelay);
-#ifdef DEBUG
+//#ifdef DEBUG
   Serial.println(F("motors are Armed "));
-#endif
+//#endif
 }//end of armAllMotors function
+
+void disArmMotors(){
+  motor0.write(motorArmValue);
+  motor1.write(motorArmValue);
+  motor2.write(motorArmValue);
+  motor3.write(motorArmValue);
+  Serial.println("motors are disarmed ");
+}
 
 //ISR for MPU 6050
 void dmpDataReady() {
@@ -692,7 +701,6 @@ void setup() {
   initializeMotors();
   initMPU();
   initPID();
-  armAllMotors();
 
 }//end of setup
 
@@ -703,6 +711,16 @@ void loop() {
     //    Serial.print("waiting for mpu");
   }//end of while loop
   updateAnglesFromMPU();
+  if(armMotors == true && motorsArmed == false){
+      armAllMotors();
+      motorsArmed = true;
+  }
+
+  if(armMotors == false){
+    disArmMotors();
+    motorsArmed = false;
+  }
+  
 if(armMotors == true){
   computePID();
   updateMotors();
