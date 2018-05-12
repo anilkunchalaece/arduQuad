@@ -80,7 +80,11 @@
 
 //#define DEBUG
 #define TUNING
+#define SAFE_MODE
 
+#ifdef SAFE_MODE
+    #define SAFE_MODE_MAX_VALUE 1500
+#endif  
 
 //required parameters for tuning
 #ifdef TUNING
@@ -266,6 +270,7 @@ ISR(PCINT0_vect) {
 void updateMotors() {
 
   int width = pwmDuration[2];
+  int throttle;
 
   if (width < 1200 ) {
 #ifdef DEBUG
@@ -279,15 +284,29 @@ void updateMotors() {
     Serial.print("ch2");
     Serial.println(pwmDuration[2]);
 #endif
-    motor0.write(motorArmValue);
-    motor1.write(motorArmValue);
-    motor2.write(motorArmValue);
-    motor3.write(motorArmValue);
+
+
+//    motor0.write(motorArmValue);
+//    motor1.write(motorArmValue);
+//    motor2.write(motorArmValue);
+//    motor3.write(motorArmValue);
 
   }
   else
   {
-    int throttle = map(width, throttleMinValue, throttleMaxValue, motorMinValue, motorMaxValue);
+    throttle = map(width, throttleMinValue, throttleMaxValue, motorMinValue, motorMaxValue);
+
+#ifdef SAFE_MODE
+    if (throttle > SAFE_MODE_MAX_VALUE) {
+      throttle = SAFE_MODE_MAX_VALUE;
+      Serial.println("throttle decreased");
+    }
+#endif
+
+    m0Value = throttle - pidPitchOut; //- pidYawOut;
+    m1Value = throttle - pidRollOut; //+ pidYawOut;
+    m2Value = throttle + pidPitchOut; //- pidYawOut;
+    m3Value = throttle + pidRollOut; //+ pidYawOut;
 #ifdef DEBUG
     Serial.print(F("received val is "));
     Serial.println(throttle);
@@ -297,12 +316,6 @@ void updateMotors() {
     Serial.println(pwmDuration[1]);
     Serial.print(F("ch2"));
     Serial.println(pwmDuration[2]);
-#endif
-    m0Value = throttle - pidPitchOut; //- pidYawOut;
-    m1Value = throttle - pidRollOut; //+ pidYawOut;
-    m2Value = throttle + pidPitchOut; //- pidYawOut;
-    m3Value = throttle + pidRollOut; //+ pidYawOut;
-#ifdef DEBUG
     Serial.print("<"); Serial.print(m0Value); Serial.print(",");
     Serial.print(m1Value);Serial.print(","); Serial.print(m2Value);
     Serial.print(",");Serial.print(m3Value);Serial.print(",");
@@ -311,6 +324,8 @@ void updateMotors() {
     Serial.print(",");Serial.print(pidPitchOut);
     Serial.print(",");Serial.print(pidRollOut);Serial.println(">");
 #endif
+
+
     motor0.write(m0Value);
     motor1.write(m1Value);
     motor2.write(m2Value);
@@ -324,11 +339,19 @@ void initializeMotors() {
   motor1.attach(m1);
   motor2.attach(m2);
   motor3.attach(m3);
-#ifdef DEBUG
+  disArmMotors();
+//#ifdef DEBUG
   Serial.println(F("motors initialized"));
-#endif
+//#endif
 }//end of initializeMotorsFunction
 
+
+void detachMotors(){
+  motor0.detach();
+  motor1.detach();
+  motor2.detach();
+  motor3.detach();
+}
 
 void armAllMotors() {
   motor0.write(motorArmValue);
@@ -698,7 +721,6 @@ void setup() {
   digitalWrite(8, HIGH);
   Serial.begin(38400); //hc-05 is using hardware serial , 38400 is HC-05 Default Baud Rate
 
-  initializeMotors();
   initMPU();
   initPID();
 
@@ -712,12 +734,14 @@ void loop() {
   }//end of while loop
   updateAnglesFromMPU();
   if(armMotors == true && motorsArmed == false){
+      initializeMotors();
       armAllMotors();
       motorsArmed = true;
   }
 
   if(armMotors == false){
     disArmMotors();
+    detachMotors();
     motorsArmed = false;
   }
   
