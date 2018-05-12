@@ -60,6 +60,10 @@
         Offset is not working adding Autocalibration for MPU6050.
         I shamelessly copied code from http://wired.chillibasket.com/2015/01/calibrating-mpu6050/
 
+    Date : 12 May 2018
+        PID is calculating even radio is not ON. so i am adding Arming and DisArming Routine 
+        To ARM Motors : Throttle is MIN (i.e CH3 - 1200) AND YAW MAX (CH4 - 1800)
+        To DISARM Motors : Throttle is MIN (i.e CH3 - 1200 ) AND ROLL MAX (CH4 - 1800)
 */
 #include<Servo.h>
 #include <PID_v1.h> //PID Library by Brett Beauregard ref:https://github.com/br3ttb/Arduino-PID-Library
@@ -158,6 +162,7 @@ unsigned long btDataStartMillis = millis();
 
 
 volatile boolean recvPCInt = false;
+volatile boolean armMotors = false;
 
 Servo motor0;
 Servo motor1;
@@ -245,7 +250,16 @@ ISR(PCINT0_vect) {
       prevPortState[c] = 0; //update Present PortState
     }
   }//end of for loop
-  //portValue = PINB & 0x0f;//we are only intrested in first four bits
+
+  if(pwmDuration[2] < 1250 && pwmDuration[3] > 1700){
+    //Throttle Min And Yaw Max
+    armMotors = true;
+  }
+
+  if(pwmDuration[2] < 1250 && pwmDuration[0] > 1700){
+    //Throttle Min and Roll Max
+    armMotors = false;
+  }
 }
 
 void updateMotors() {
@@ -269,7 +283,6 @@ void updateMotors() {
     motor2.write(motorArmValue);
     motor3.write(motorArmValue);
 
-
   }
   else
   {
@@ -289,35 +302,18 @@ void updateMotors() {
     m2Value = throttle + pidPitchOut; //- pidYawOut;
     m3Value = throttle + pidRollOut; //+ pidYawOut;
 #ifdef DEBUG
-    Serial.print("<");
-    Serial.print(m0Value);
-    Serial.print(",");
-    Serial.print(m1Value);
-    Serial.print(",");
-    Serial.print(m2Value);
-    Serial.print(",");
-    Serial.print(m3Value);
-    Serial.print(",");
-    Serial.print(pidYawIn);
-    Serial.print(",");
-    Serial.print(pidPitchIn);
-    Serial.print(",");
-    Serial.print(pidRollIn);
-    Serial.print(",");
-    Serial.print(pidPitchOut);
-    Serial.print(",");
-    Serial.print(pidRollOut);
-    Serial.println(">");
+    Serial.print("<"); Serial.print(m0Value); Serial.print(",");
+    Serial.print(m1Value);Serial.print(","); Serial.print(m2Value);
+    Serial.print(",");Serial.print(m3Value);Serial.print(",");
+    Serial.print(pidYawIn);Serial.print(",");Serial.print(pidPitchIn);
+    Serial.print(",");Serial.print(pidRollIn);
+    Serial.print(",");Serial.print(pidPitchOut);
+    Serial.print(",");Serial.print(pidRollOut);Serial.println(">");
 #endif
     motor0.write(m0Value);
     motor1.write(m1Value);
     motor2.write(m2Value);
     motor3.write(m3Value);
-#ifdef DEBUG
-    Serial.print(F("motors are updated with value => "));
-    Serial.println(throttle);
-#endif
-
   }//end of ifElse
 }//end of update motors
 
@@ -355,13 +351,12 @@ void initMPU() {
 
   //calibrate MPU
   calibrateMPU6050();
+  //without this reset MPU going crazy
   mpu.reset();
   //wait After Calibration
-  delay(2000);
-
+  delay(1000);
   mpu.initialize();
   devStatus = mpu.dmpInitialize();
-
   //setOffsets
   mpu.setXAccelOffset(ax_offset);
   mpu.setYAccelOffset(ay_offset);
@@ -421,29 +416,28 @@ void initPID() {
   rollController.SetSampleTime(10);
   pitchController.SetSampleTime(10);
   yawController.SetSampleTime(10);
-
 #ifdef DEBUG
   Serial.println(F("pid initialisation completed"));
 #endif
 }//end of initPID
 
-
 void setPointUpdate() {
   if (pwmDuration[0] > chMid - 20  && pwmDuration[0] < chMid + 20) {
     pidRollSetPoint = 0;
   } else {
+    //ref : https://arduino.stackexchange.com/questions/9219/why-is-the-constrain-function-used-after-the-map-function
     pidRollSetPoint = map(pwmDuration[0], ch0Min, ch0Max, rollMin, rollMax);
+    pidRollSetPoint = constrain(pidRollSetPoint, rollMin, rollMax);
   }
   if (pwmDuration[1] > chMid - 20 && pwmDuration[1] < chMid + 20) {
     pidPitchSetPoint = 0;
   } else {
     pidPitchSetPoint = map(pwmDuration[1], ch1Min, ch1Max, pitchMin, pitchMax);
+    pidPitchSetPoint = constrain(pidPitchSetPoint, pitchMin, pitchMax);
   }
 #ifdef DEBUG
-  Serial.print("pitch set point ");
-  Serial.println(pidPitchSetPoint);
-  Serial.print("roll set point ");
-  Serial.println(pidRollSetPoint);
+  Serial.print("pitch set point "); Serial.println(pidPitchSetPoint); 
+  Serial.print("roll set point "); Serial.println(pidRollSetPoint);
 #endif
 
 }//end of setPointUpdateFcn
@@ -455,18 +449,14 @@ void computePID() {
   pidRollIn = ypr[1] * 180 / M_PI;
   setPointUpdate();
 #ifdef DEBUG
-  Serial.print(F("y p r "));
-  Serial.print(pidYawIn);
-  Serial.print(F("\t"));
-  Serial.print(pidPitchIn);
-  Serial.print(F("\t"));
-  Serial.println(pidRollIn);
+  Serial.print(F("y p r ")); Serial.print(pidYawIn);
+  Serial.print(F("\t")); Serial.print(pidPitchIn);
+  Serial.print(F("\t")); Serial.println(pidRollIn);
 #endif
   rollController.Compute();
   pitchController.Compute();
   yawController.Compute();
   //compute the setPoint
-
 }//end of computePID
 
 
@@ -492,28 +482,16 @@ void processReceivedData() {
   strtokIndex = strtok(NULL, strtokDelimiter); // get yi
   yi = atof(strtokIndex);
 
-
-  Serial.print(F("pp"));
-  Serial.print(pp);
-  Serial.print(F("pi"));
-  Serial.print(pi);
-  Serial.print(F("pd"));
-  Serial.println(pd);
-  Serial.print(F("rp"));
-  Serial.print(rp);
-  Serial.print(F("ri"));
-  Serial.print(ri);
-  Serial.print(F("rd"));
-  Serial.println(rd);
-  Serial.print(F("yp"));
-  Serial.print(yp);
-  Serial.print(F("yi"));
-  Serial.print(yi);
-  Serial.print(F("yd"));
-  Serial.println(yd);
-
+  Serial.print(F("pp")); Serial.print(pp);
+  Serial.print(F("pi")); Serial.print(pi);
+  Serial.print(F("pd")); Serial.println(pd);
+  Serial.print(F("rp")); Serial.print(rp);
+  Serial.print(F("ri")); Serial.print(ri);
+  Serial.print(F("rd")); Serial.println(rd);
+  Serial.print(F("yp")); Serial.print(yp);
+  Serial.print(F("yi")); Serial.print(yi);
+  Serial.print(F("yd")); Serial.println(yd);
   setModifiedTunings();//add tuning parameters to PID
-
 }//end of processReceivedData
 
 void setModifiedTunings() {
@@ -527,13 +505,12 @@ void checkForBTInput() {
   if (Serial.available()) {
     //Serial.write(BTSerial.read());
     char recvChar = Serial.read();
-
     if (recvChar == startingChar) {
       storeRecvData = true;
       index = 0; //set the index back to starting
     }//end of if
 
-    if (recvChar == endingChar) {
+   if (recvChar == endingChar) {
       storeRecvData = false;
       recvDataBuffer[index] = 0; //null terminating the string
       //Serial.println(recvDataBuffer);
@@ -544,7 +521,7 @@ void checkForBTInput() {
       if (recvChar != startingChar) {
         recvDataBuffer[index] = recvChar; //store the received char in buffer
         index = index + 1; //increment the index
-      }//end of if Dumb Workaroung
+      }//end of if. Dumb Workaroung :)
     }
 
   }//end of If
@@ -555,45 +532,29 @@ void checkForBTInput() {
 void sendBTOutput() {
   if (millis() - btDataStartMillis > DATA_INTERVAL) {
     btDataStartMillis = millis();
-    Serial.print(F("y"));
-    Serial.print(pidYawIn);
-    Serial.print(F("p"));
-    Serial.print(pidPitchIn);
-    Serial.print(F("r"));
-    Serial.print(pidRollIn);
-    Serial.print(F("ps"));
-    Serial.print(pidPitchSetPoint);
-    Serial.print(F("rs"));
-    Serial.print(pidRollSetPoint);
-    Serial.print(F("ys"));
-    Serial.print(pidYawSetPoint);
-    Serial.print(F("po"));
-    Serial.print(pidPitchOut);
-    Serial.print(F("ro"));
-    Serial.print(pidRollOut);
-    Serial.print(F("yo"));
-    Serial.print(pidYawOut);
-    Serial.print(F("m0-"));
-    Serial.print(m0Value);
-    Serial.print(F("m1-"));
-    Serial.print(m1Value);
-    Serial.print(F("m2-"));
-    Serial.print(m2Value);
-    Serial.print(F("m3-"));
-    Serial.print(m3Value);
-    Serial.print(F("c0"));
-    Serial.print(pwmDuration[0]);
-    Serial.print(F("c1"));
-    Serial.print(pwmDuration[1]);
-    Serial.print(F("c2"));
-    Serial.println(pwmDuration[2]);
+    Serial.print(F("y")); Serial.print(pidYawIn);Serial.print(F(">"));
+    Serial.print(F("p")); Serial.print(pidPitchIn);Serial.print(F(">"));
+    Serial.print(F("r")); Serial.print(pidRollIn);Serial.print(F(">"));
+    Serial.print(F("ps")); Serial.print(pidPitchSetPoint);Serial.print(F(">"));
+    Serial.print(F("rs")); Serial.print(pidRollSetPoint);Serial.print(F(">"));
+    Serial.print(F("ys")); Serial.print(pidYawSetPoint);Serial.print(F(">"));
+    Serial.print(F("po")); Serial.print(pidPitchOut);Serial.print(F(">"));
+    Serial.print(F("ro")); Serial.print(pidRollOut);Serial.print(F(">"));
+    Serial.print(F("yo")); Serial.print(pidYawOut);Serial.print(F(">"));
+    Serial.print(F("m0-")); Serial.print(m0Value);Serial.print(F(">"));
+    Serial.print(F("m1-")); Serial.print(m1Value);Serial.print(F(">"));
+    Serial.print(F("m2-")); Serial.print(m2Value);Serial.print(F(">"));
+    Serial.print(F("m3-")); Serial.print(m3Value);Serial.print(F(">"));
+    Serial.print(F("c0")); Serial.print(pwmDuration[0]);Serial.print(F(">"));
+    Serial.print(F("c1")); Serial.print(pwmDuration[1]);Serial.print(F(">"));
+    Serial.print(F("c2")); Serial.print(pwmDuration[2]);Serial.print(F(">"));
+    Serial.print(F("c3")); Serial.print(pwmDuration[3]);Serial.print(F(">"));
+    Serial.println("");
   }//end of IF
 }//end of sendBTOutput Fcn
 
 
-
 void calibrateMPU6050() {
-
   // reset offsets
   mpu.setXAccelOffset(0);
   mpu.setYAccelOffset(0);
@@ -606,14 +567,14 @@ void calibrateMPU6050() {
     Serial.println(F("\nReading sensors for first time..."));
     meansensors();
     state++;
-    delay(1000);
+    delay(100);
   }
 
   if (state == 1) {
     Serial.println(F("\nCalculating offsets..."));
     calibration();
     state++;
-    delay(1000);
+    delay(100);
   }
 
   if (state == 2) {
@@ -621,34 +582,22 @@ void calibrateMPU6050() {
 #ifdef DEBUG
     Serial.println(F("\nFINISHED!"));
     Serial.print(F("\nSensor readings with offsets:\t"));
-    Serial.print(mean_ax);
-    Serial.print(F("\t"));
-    Serial.print(mean_ay);
-    Serial.print(F("\t"));
-    Serial.print(mean_az);
-    Serial.print(F("\t"));
-    Serial.print(mean_gx);
-    Serial.print(F("\t"));
-    Serial.print(mean_gy);
-    Serial.print(F("\t"));
-    Serial.println(mean_gz);
-    Serial.print(F("Your offsets:\t"));
-    Serial.print(ax_offset);
-    Serial.print(F("\t"));
-    Serial.print(ay_offset);
-    Serial.print(F("\t"));
-    Serial.print(az_offset);
-    Serial.print(F("\t"));
-    Serial.print(gx_offset);
-    Serial.print(F("\t"));
-    Serial.print(gy_offset);
-    Serial.print(F("\t"));
-    Serial.println(gz_offset);
-    Serial.println(F("\nData is printed as: acelX acelY acelZ giroX giroY giroZ"));
+    Serial.print(mean_ax); Serial.print(F("\t"));
+    Serial.print(mean_ay); Serial.print(F("\t"));
+    Serial.print(mean_az); Serial.print(F("\t"));
+    Serial.print(mean_gx); Serial.print(F("\t"));
+    Serial.print(mean_gy); Serial.print(F("\t"));
+    Serial.println(mean_gz); Serial.print(F("Your offsets:\t"));
+    Serial.print(ax_offset); Serial.print(F("\t"));
+    Serial.print(ay_offset); Serial.print(F("\t"));
+    Serial.print(az_offset); Serial.print(F("\t"));
+    Serial.print(gx_offset); Serial.print(F("\t"));
+    Serial.print(gy_offset);  Serial.print(F("\t"));
+    Serial.println(gz_offset);  Serial.println(F("\nData is printed as: acelX acelY acelZ giroX giroY giroZ"));
     Serial.println(F("Check that your sensor readings are close to 0 0 16384 0 0 0"));
     Serial.println(F("If calibration was succesful write down your offsets so you can set them in your projects using something similar to mpu.setXAccelOffset(youroffset)"));
 #endif
-
+  Serial.println("Calibration Completed");
     return;
   }
 }//end of calibrateMPU6050 Fcn
@@ -660,7 +609,6 @@ void meansensors() {
   while (i < (buffersize + 101)) {
     // read raw accel/gyro measurements from device
     mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
-
     if (i > 100 && i <= (buffersize + 100)) { //First 100 measures are discarded
       buff_ax = buff_ax + ax;
       buff_ay = buff_ay + ay;
@@ -701,7 +649,7 @@ void calibration() {
     mpu.setZGyroOffset(gz_offset);
 
     meansensors();
-    Serial.println(F("..."));
+    Serial.println(F("......................................"));
 
     if (abs(mean_ax) <= acel_deadzone) ready++;
     else ax_offset = ax_offset - mean_ax / acel_deadzone;
@@ -729,11 +677,13 @@ void calibration() {
 void setup() {
   cli(); //Clear all interrupts
   PCICR |= 1 << PCIE0; //Enable port B Registers i.e D8-D13
-  PCMSK0 |= 1 << PCINT2 | 1 << PCINT1 | 1 << PCINT0 ; // Pin10,9,8
+  PCMSK0 |= 1<< PCINT3 | 1 << PCINT2 | 1 << PCINT1 | 1 << PCINT0 ; // Pin11,10,9,8
   sei(); //enable all interrupts
   pinMode(8, INPUT);
   pinMode(9, INPUT);
   pinMode(10, INPUT);
+  pinMode(11,INPUT);
+  digitalWrite(11,HIGH);
   digitalWrite(10, HIGH); //enable pull up in pin
   digitalWrite(9, HIGH);
   digitalWrite(8, HIGH);
@@ -752,13 +702,15 @@ void loop() {
     //they are saying it is a short delay .. i need a way to avoid this
     //    Serial.print("waiting for mpu");
   }//end of while loop
-
   updateAnglesFromMPU();
+if(armMotors == true){
   computePID();
   updateMotors();
+}//end of armMotors 
 #ifdef TUNING
   checkForBTInput();
   sendBTOutput();
 #endif
+
 }//end of loop
 
