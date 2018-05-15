@@ -118,22 +118,17 @@ unsigned long btDataStartMillis = millis();
 
 //PID Constants
 
-/*
-    13 Apr 2018
-    Changed #defined to float to change pid parameters using bluetooth
-*/
-#define pitchPVal 0.5
-#define pitchDVal 0.24
-#define pitchIVal 0.04
+#define pitchPVal 0.7
+#define pitchDVal 0.25
+#define pitchIVal 0.0
 
-#define rollPVal 0.5
-#define rollDVal 0.24
-#define rollIVal 0.04
+#define rollPVal 0.7
+#define rollDVal 0.25
+#define rollIVal 0.0
 
-#define yawPVal 0.5
-#define yawDVal 0.24
-#define yawIVal 0.04
-
+#define yawPVal 0
+#define yawDVal 0
+#define yawIVal 0
 
 //Flight Parameters
 #define pitchMin -30
@@ -303,10 +298,10 @@ void updateMotors() {
     }
 #endif
 
-    m0Value = throttle - pidPitchOut; //- pidYawOut;
-    m1Value = throttle - pidRollOut; //+ pidYawOut;
-    m2Value = throttle + pidPitchOut; //- pidYawOut;
-    m3Value = throttle + pidRollOut; //+ pidYawOut;
+    m0Value = throttle + pidPitchOut; //- pidYawOut;
+    m1Value = throttle + pidRollOut; //+ pidYawOut;
+    m2Value = throttle - pidPitchOut; //- pidYawOut;
+    m3Value = throttle - pidRollOut; //+ pidYawOut;
 #ifdef DEBUG
     Serial.print(F("received val is "));
     Serial.println(throttle);
@@ -324,8 +319,12 @@ void updateMotors() {
     Serial.print(",");Serial.print(pidPitchOut);
     Serial.print(",");Serial.print(pidRollOut);Serial.println(">");
 #endif
-
-
+    //keep the motors running
+    if (m0Value < motorArmValue) m0Value = motorArmValue+50;
+    if (m1Value < motorArmValue) m1Value = motorArmValue+50;
+    if (m2Value < motorArmValue) m2Value = motorArmValue+50;
+    if (m3Value < motorArmValue) m3Value = motorArmValue+50;
+            
     motor0.write(m0Value);
     motor1.write(m1Value);
     motor2.write(m2Value);
@@ -365,10 +364,10 @@ void armAllMotors() {
 }//end of armAllMotors function
 
 void disArmMotors(){
-  motor0.write(motorArmValue);
-  motor1.write(motorArmValue);
-  motor2.write(motorArmValue);
-  motor3.write(motorArmValue);
+  motor0.write(motorArmValue - 100);
+  motor1.write(motorArmValue - 100);
+  motor2.write(motorArmValue - 100);
+  motor3.write(motorArmValue - 100);
   Serial.println("motors are disarmed ");
 }
 
@@ -382,21 +381,21 @@ void initMPU() {
   mpu.initialize();
 
   //calibrate MPU
-  calibrateMPU6050();
+  //calibrateMPU6050();
   //without this reset MPU going crazy
-  mpu.reset();
+  //mpu.reset();
   //wait After Calibration
-  delay(1000);
+  //delay(1000);
   mpu.initialize();
   devStatus = mpu.dmpInitialize();
   //setOffsets
-  mpu.setXAccelOffset(ax_offset);
-  mpu.setYAccelOffset(ay_offset);
-  mpu.setZAccelOffset(az_offset);
+  //mpu.setXAccelOffset(ax_offset);
+  //mpu.setYAccelOffset(ay_offset);
+  //mpu.setZAccelOffset(az_offset);
 
-  mpu.setXGyroOffset(gx_offset);
-  mpu.setYGyroOffset(gy_offset);
-  mpu.setZGyroOffset(gz_offset);
+  //mpu.setXGyroOffset(gx_offset);
+  //mpu.setYGyroOffset(gy_offset);
+  //mpu.setZGyroOffset(gz_offset);
 
 
   if (devStatus == 0) {
@@ -418,7 +417,7 @@ void updateAnglesFromMPU() {
   mpuIntStatus = mpu.getIntStatus();
   fifoCount = mpu.getFIFOCount();
 
-  if ((mpuIntStatus & 0x10) || fifoCount >= 1024) {
+  if ((mpuIntStatus & 0x10) || fifoCount == 1024) {
 
     mpu.resetFIFO();
 
@@ -445,9 +444,9 @@ void initPID() {
   rollController.SetMode(AUTOMATIC);
   pitchController.SetMode(AUTOMATIC);
   yawController.SetMode(AUTOMATIC);
-  rollController.SetSampleTime(10);
-  pitchController.SetSampleTime(10);
-  yawController.SetSampleTime(10);
+//  rollController.SetSampleTime(10);
+//  pitchController.SetSampleTime(10);
+//  yawController.SetSampleTime(10);
 #ifdef DEBUG
   Serial.println(F("pid initialisation completed"));
 #endif
@@ -514,16 +513,17 @@ void processReceivedData() {
   strtokIndex = strtok(NULL, strtokDelimiter); // get yi
   yi = atof(strtokIndex);
 
-  Serial.print(F("pp")); Serial.print(pp);
-  Serial.print(F("pi")); Serial.print(pi);
-  Serial.print(F("pd")); Serial.println(pd);
-  Serial.print(F("rp")); Serial.print(rp);
-  Serial.print(F("ri")); Serial.print(ri);
-  Serial.print(F("rd")); Serial.println(rd);
-  Serial.print(F("yp")); Serial.print(yp);
-  Serial.print(F("yi")); Serial.print(yi);
-  Serial.print(F("yd")); Serial.println(yd);
-  setModifiedTunings();//add tuning parameters to PID
+  Serial.print(F("pp")); Serial.print(pp);Serial.print(F(","));
+  Serial.print(F("pi")); Serial.print(pi);Serial.print(F(","));
+  Serial.print(F("pd")); Serial.println(pd);Serial.print(F(","));
+  Serial.print(F("rp")); Serial.print(rp);Serial.print(F(","));
+  Serial.print(F("ri")); Serial.print(ri);Serial.print(F(","));
+  Serial.print(F("rd")); Serial.print(rd);Serial.print(F(","));
+  Serial.print(F("yp")); Serial.print(yp);Serial.print(F(","));
+  Serial.print(F("yi")); Serial.print(yi);Serial.print(F(","));
+  Serial.print(F("yd")); Serial.print(yd);Serial.print(F(","));
+  Serial.println("");
+  if (pp > 0 && pd > 0 && pi > 0 )  setModifiedTunings();//add tuning parameters to PID if all the pitch pid parameters are positive
 }//end of processReceivedData
 
 void setModifiedTunings() {
@@ -730,8 +730,9 @@ void loop() {
   while (!mpuInterrupt && fifoCount < packetSize) {
     //Do nothing while mpu is not working
     //they are saying it is a short delay .. i need a way to avoid this
-    //    Serial.print("waiting for mpu");
+        Serial.print("waiting for mpu");
   }//end of while loop
+
   updateAnglesFromMPU();
   if(armMotors == true && motorsArmed == false){
       initializeMotors();
