@@ -10,9 +10,9 @@
 //SoftwareSerial BTSerial(A0,A1); // TX, RX
 SoftwareSerial BTSerial(3,4); // TX, RX
 
-#define p 0.5
-#define d 0.24
-#define i 0.03
+#define p 0.7
+#define d 0.20
+#define i 0.0
 
 #define pp p
 #define pi i
@@ -27,7 +27,7 @@ SoftwareSerial BTSerial(3,4); // TX, RX
 #define yd 0
 
 void setup() {
-Serial.begin(9600);
+Serial.begin(115200);
 Serial.println("AT MODE");
 BTSerial.begin(38400); //HC-5 Default Speed in AT Mode
 
@@ -57,6 +57,10 @@ void loop(){
 // BTSerial.println("<1.2,1.3,1.4,1,1,1,1,1,1>");
 if(BTSerial.available()){
   Serial.write(BTSerial.read());
+}
+
+if(Serial.available()){
+  BTSerial.print(Serial.read());
 }
 }
 

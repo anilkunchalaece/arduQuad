@@ -13,6 +13,7 @@ import pyqtgraph as pg
 import numpy as np
 import serial
 import re
+import datetime
 
 arduinoData = serial.Serial('/dev/ttyACM0', 115200) #Creating our serial object named arduinoData
 
@@ -34,6 +35,12 @@ x1 = []
 x2 = []
 x3 = []
 x4 = []
+
+myTime = datetime.datetime.now()
+fHandler = open(myTime.strftime("%Y%B%d-%X")+'.csv','w')
+fHandler.write('y,p,r,ys,ps,rs,po,ro,yo,m0,m1,m2,m3,ch1,ch2,ch3\n')
+
+fHandlerDebug = open('debug'+myTime.strftime("%Y%B%d-%X")+'.txt','w')
 
 #Always start by initializing Qt
 app = QtGui.QApplication([])
@@ -151,6 +158,12 @@ instLayout.addWidget(ch2InstLable,5,1)
 instLayout.addWidget(ch3InstLable,6,1)
 instLayout.addWidget(ch4InstLable,7,1)
 
+#Function to execute when user changes value
+def pidValueChange():
+    #format to send is <pp,pd,pi,rp,rd,ri,yp,yd,yi>
+    pidValueString = '<'+str(pp.value())+','+str(pd.value())+','+str(pi.value())+','+str(rp.value())+','+str(rd.value())+','+str(ri.value())+','+str(yp.value())+','+str(yd.value())+','+str(yi.value())+'>'
+    # arduinoData.write(pidValueString)
+    print 'pidValue is '+ pidValueString
 ##Create a layout for the pidData
 pidDataLayout = QtGui.QGridLayout()
 pidData.setLayout(pidDataLayout)
@@ -166,6 +179,7 @@ plabel = QtGui.QLabel('Pitch')
 plabel.setAlignment(Qt.AlignBottom)
 pp = QtGui.QDoubleSpinBox()
 pp.setSingleStep(0.01)
+pp.setReadOnly(True)
 pi = QtGui.QDoubleSpinBox()
 pi.setSingleStep(0.01)
 pd = QtGui.QDoubleSpinBox()
@@ -189,6 +203,17 @@ yi.setSingleStep(0.01)
 yd = QtGui.QDoubleSpinBox()
 yd.setSingleStep(0.01)
 
+pp.valueChanged.connect(pidValueChange)
+pi.valueChanged.connect(pidValueChange)
+pd.valueChanged.connect(pidValueChange)
+
+rp.valueChanged.connect(pidValueChange)
+ri.valueChanged.connect(pidValueChange)
+rd.valueChanged.connect(pidValueChange)
+
+yp.valueChanged.connect(pidValueChange)
+yi.valueChanged.connect(pidValueChange)
+yd.valueChanged.connect(pidValueChange)
 
 rawData = QtGui.QLabel("Raw Data From Quad")
 rawDataString = QtGui.QLabel()
@@ -278,9 +303,19 @@ def checkForReadings(data):
     m2 = re.findall(r"m2-([-+]?\d*\.\d+|\d+)>",data)
     m3 = re.findall(r"m3-([-+]?\d*\.\d+|\d+)>",data)
     rr = re.findall(r"c0([-+]?\d*\.\d+|\d+)>",data)
-    rp = re.findall(r"c1([-+]?\d*\.\d+|\d+)>",data)
+    rp1 = re.findall(r"c1([-+]?\d*\.\d+|\d+)>",data)
     rt = re.findall(r"c2([-+]?\d*\.\d+|\d+)>",data)
     ry = re.findall(r"c3([-+]?\d*\.\d+|\d+)>",data)
+
+    ppVal = re.findall(r"pp([-+]?\d*\.\d+|\d+),",data)
+    piVal = re.findall(r"pi([-+]?\d*\.\d+|\d+),",data)
+    pdVal = re.findall(r"pd([-+]?\d*\.\d+|\d+),",data)
+    rpVal = re.findall(r"rp([-+]?\d*\.\d+|\d+),",data)
+    riVal = re.findall(r"ri([-+]?\d*\.\d+|\d+),",data)
+    rdVal = re.findall(r"rd([-+]?\d*\.\d+|\d+),",data)
+    ypVal = re.findall(r"yp([-+]?\d*\.\d+|\d+),",data)
+    yiVal = re.findall(r"yi([-+]?\d*\.\d+|\d+),",data)
+    ydVal = re.findall(r"yd([-+]?\d*\.\d+|\d+),",data)
 
     if len(p) > 0 and len(ps) > 0:
     	pitchVal.append(float(p[0]))
@@ -324,21 +359,46 @@ def checkForReadings(data):
             m2Val.pop(0)
             m3Val.pop(0) 
 
+#Setting the Transmitter Instant Values
     if len(rr) > 0 :
         ch1InstLable.setText('CH1 --> '+rr[0])
-    if len(rp) > 0 :
-        ch2InstLable.setText('CH2 --> '+rp[0])
+    if len(rp1) > 0 :
+        ch2InstLable.setText('CH2 --> '+rp1[0])
     if len(rt) > 0 :
         ch3InstLable.setText('CH3 --> '+rt[0])
     if len(ry) > 0 :
         ch4InstLable.setText('CH4 --> '+ry[0])
+#Setting the pidSetOutput Instant Values
     if len(po) > 0 :
         pitchPIDOutInstLable.setText('Pitch PID Out --> '+po[0])
     if len(ro) > 0 :
         rollPIDOutInstLable.setText('Roll PID Out --> '+ro[0])
     if len(yo) > 0:
         yawPIDOutInstLable.setText('Yaw PID Out --> '+yo[0])
-    print [y,p,r,ps,rs,po,ro,m0,m1,m2,m3]
+
+#Updating the PID values received from quad
+    # if len(ppVal) > 0:
+    #     pp.setValue(float(ppVal[0]))   
+    # if len(piVal) > 0:
+    #     pi.setValue(float(piVal[0]))
+    # if len(pdVal) > 0:
+    #     pd.setValue(float(pdVal[0]))
+    # if len(rpVal) > 0:
+    #     rp.setValue(float(rpVal[0]))
+    # if len(riVal) > 0:
+    #     ri.setValue(float(riVal[0]))
+    # if len(rdVal) > 0:
+    #     rd.setValue(float(rdVal[0]))
+    # if len(ypVal) > 0:
+    #     yp.setValue(float(ypVal[0]))
+    # if len(yiVal) > 0:
+    #     yi.setValue(float(yiVal[0]))
+    # if len(ydVal) > 0:
+    #     yd.setValue(float(ydVal[0]))
+    # print [y,p,r,ps,rs,po,ro,m0,m1,m2,m3]
+    #fHandler.write('y,p,r,ys,ps,rs,po,ro,yo,m0,m1,m2,m3,ch1,ch2,ch3\n')
+    if len(y) > 0 and len(p) > 0 and len(r) > 0 :
+        fHandler.write(y[0]+','+p[0]+','+r[0]+'\n')
 
 def checkData():
     # print "check data"
@@ -347,7 +407,8 @@ def checkData():
         # print arduinoData.read()
         recvString = recvString + arduinoData.read()
         #recvText.setText(recvString)
-    rawDataString.setText(recvString) 
+    rawDataString.setText(recvString)
+    fHandlerDebug.write(recvString) 
     checkForReadings(recvString)
     app.processEvents()
 

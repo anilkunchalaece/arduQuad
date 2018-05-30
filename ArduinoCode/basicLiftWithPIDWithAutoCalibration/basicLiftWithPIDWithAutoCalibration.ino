@@ -420,6 +420,7 @@ void updateAnglesFromMPU() {
   if ((mpuIntStatus & 0x10) || fifoCount == 1024) {
 
     mpu.resetFIFO();
+    Serial.println("mpu6050 FiFo Reset");
 
   } else if (mpuIntStatus & 0x02) {
 
@@ -432,6 +433,10 @@ void updateAnglesFromMPU() {
     mpu.dmpGetQuaternion(&q, fifoBuffer);
     mpu.dmpGetGravity(&gravity, &q);
     mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
+
+    pidYawIn = ypr[0] * 180 / M_PI; //Converts Radians to degrees ref - https://forum.arduino.cc/index.php?topic=446713.msg3078076#msg3078076
+    pidPitchIn = ypr[2] * 180 / M_PI; //Changed 1 to 2 Due to some problem in Orientation or sensor ? NEED TO FIX IT
+    pidRollIn = ypr[1] * 180 / M_PI;
 
   }
 
@@ -475,9 +480,6 @@ void setPointUpdate() {
 
 
 void computePID() {
-  pidYawIn = ypr[0] * 180 / M_PI; //Converts Radians to degrees ref - https://forum.arduino.cc/index.php?topic=446713.msg3078076#msg3078076
-  pidPitchIn = ypr[2] * 180 / M_PI; //Changed 1 to 2 Due to some problem in Orientation or sensor ? NEED TO FIX IT
-  pidRollIn = ypr[1] * 180 / M_PI;
   setPointUpdate();
 #ifdef DEBUG
   Serial.print(F("y p r ")); Serial.print(pidYawIn);
@@ -747,7 +749,7 @@ void loop() {
   }
   
 if(armMotors == true){
-  computePID();
+  //computePID();
   updateMotors();
 }//end of armMotors 
 #ifdef TUNING

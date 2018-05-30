@@ -40,7 +40,7 @@
 
 Servo currentMotor;
 
-int currentMotorPin = m3;
+int currentMotorPin = m0;
 
 int recvValue ;
 
@@ -54,6 +54,7 @@ void loop() {
   if(Serial.available()){
     recvValue = Serial.parseInt();
   }//end of If
+  Serial.println(recvValue);
    currentMotor.write(recvValue);
 }//end of loop
 

@@ -1,6 +1,7 @@
 
 /*
  * Author : Kunchala Anil
+ * Email : anilkunchalaece@gmail.com
  * Date : 13 Apr 2018
  * This sketch is used to parse the command Received via Bluetooth
  */
@@ -62,23 +63,23 @@ void processReceivedData(){
   char * strtokIndex ; //this is used by strtok() as index
     strtokIndex = strtok(recvDataBuffer,strtokDelimiter);// get the first part - pp
     pp = atof(strtokIndex); // convert to float and store
-    strtokIndex = strtok(NULL,strtokDelimiter); // this continues where the previous call left off - get pd
-    pd = atof(strtokIndex);
-    Serial.println(pd);
-    strtokIndex = strtok(NULL,strtokDelimiter); // get pi
+    strtokIndex = strtok(NULL,strtokDelimiter); // this continues where the previous call left off - get pi
     pi = atof(strtokIndex);
+    Serial.println(pd);
+    strtokIndex = strtok(NULL,strtokDelimiter); // get pd
+    pd = atof(strtokIndex);
     strtokIndex = strtok(NULL,strtokDelimiter); // get rp
     rp = atof(strtokIndex);
-    strtokIndex = strtok(NULL,strtokDelimiter); // get rd
-    rd = atof(strtokIndex);
     strtokIndex = strtok(NULL,strtokDelimiter); // get ri
-    ri = atof(strtokIndex); 
+    ri = atof(strtokIndex);
+    strtokIndex = strtok(NULL,strtokDelimiter); // get rd
+    rd = atof(strtokIndex); 
     strtokIndex = strtok(NULL,strtokDelimiter); // get yp
     yp = atof(strtokIndex); 
-    strtokIndex = strtok(NULL,strtokDelimiter); // get yd
-    yd = atof(strtokIndex);
     strtokIndex = strtok(NULL,strtokDelimiter); // get yi
-    yi = atof(strtokIndex); 
+    yi = atof(strtokIndex);
+    strtokIndex = strtok(NULL,strtokDelimiter); // get yd
+    yd = atof(strtokIndex); 
 }//end of processReceivedData
 
 

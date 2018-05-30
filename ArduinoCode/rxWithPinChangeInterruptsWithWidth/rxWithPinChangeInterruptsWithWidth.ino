@@ -5,6 +5,11 @@
  * 
  * Pin Change Interrupts - Single Rx Channel i.e Single PWM Wave
  * 
+ * PCINT0 - 8
+ * PCINT1 - 9
+ * PCINT2 - 10
+ * PCINT3 - 11 
+ * 
  */
 
 //PCMSKx - Pin Change Mask Register
@@ -16,7 +21,12 @@
 //  PCIE1 - Pin Change Interrupt Enable 1 - Port C (A0-A5)
 //  PCIE2 - Pin Change Interrupt Enable 2 - Port D (D0-D7)
 
-#define rxPin 10
+#define ch1Pin 8
+#define ch2Pin 9
+#define ch3Pin 10
+#define ch4Pin 11
+
+int rxPin = ch1Pin;
 
 volatile boolean recvPCInt = false;
 volatile byte portValue;
@@ -34,10 +44,10 @@ ISR(PCINT0_vect){
 void setup() {
 cli(); //Clear all interrupts
 PCICR |= 1 << PCIE0; //Enable port B Registers i.e D8-D13
-PCMSK0 |= 1 << PCINT2;// Pin10
+PCMSK0 |= 1 << PCINT0;
 sei(); //enable all interrupts
 pinMode(rxPin,INPUT);
-digitalWrite(rxPin,HIGH);//enable pull up in pin 9
+digitalWrite(rxPin,HIGH);//enable pull up in pin 10
 Serial.begin(9600);
 }
 

@@ -1,61 +1,61 @@
 /*
-  Author : Kunchala Anil
-  email : anilkunchalaece@gmail.com
-  Date : 15 Mar 2018
+*  Author : Kunchala Anil
+*  email : anilkunchalaece@gmail.com
+*  Date : 15 Mar 2018
+*
+*
+*  Basic lift with PID of KSRM Quad
+*
+*
+*   Connect Channel 3 to pin 10 i.e PCINT2
+*   Arm the all the Motors
+*   use Servo Write to Send the control signal to ESC
+*
+*        To Arm ESC use value 60
+*        Max Speed Can be Achieved using 130
+*
+*        Pulse Width when Throttle at Minimum position is : 1150
+*        Pulse width when Throttle at Maximum Posistion is : 1800
+*
+*        we need to map value from 1200-1800 to 60 to 130
+*
+*    
+*    Motor Directions For Quad + Configuration 
+*    
+*    m0 Front - CW
+*    m1 Right - CCW
+*    m2 Back - CW
+*    m3 Left - CCW
+*
+*      MPU6050 Connections 
+*      SCL - A5
+*      SDA - A4
+*      INT - 2
+*
+*     HC-05 Connections
+*      TX - A0
+*      RX - A1
+*
+*     Motor Connections
+*      mo - 4 Front Motor
+*      m1 - 5 Right Motor
+*      m2 - 6 Rear Motor
+*      m3 - 7 Left Motor
+*
+*      Rx Connections
+*      ch3 - 10 Throttle
 
-
-  Basic lift with PID of KSRM Quad
-
-
-   Connect Channel 3 to pin 10 i.e PCINT2
-   Arm the all the Motors
-   use Servo Write to Send the control signal to ESC
-
-        To Arm ESC use value 60
-        Max Speed Can be Achieved using 130
-
-        Pulse Width when Throttle at Minimum position is : 1150
-        Pulse width when Throttle at Maximum Posistion is : 1800
-
-        we need to map value from 1200-1800 to 60 to 130
-
- *    
- *    Motor Directions For Quad + Configuration 
- *    
- *    m0 Front - CW
- *    m1 Right - CCW
- *    m2 Back - CW
- *    m3 Left - CCW
-
-      MPU6050 Connections 
-      SCL - A5
-      SDA - A4
-      INT - 2
-
-     HC-05 Connections
-      TX - A0
-      RX - A1
-
-     Motor Connections
-      mo - 4 Front Motor
-      m1 - 5 Right Motor
-      m2 - 6 Rear Motor
-      m3 - 7 Left Motor
-
-      Rx Connections
-      ch3 - 10 Throttle
+* PCMSKx - Pin Change Mask Register
+* PCMSK0 - portB (D8-D13) (PCINT0  - PCINT6)
+* PCMSK1 - portC (A0-A5)  (PCINT8  - PCINT14)
+* PCMSK2 - portD (D0-D7)  (PCINT16 - PCINT23)
+* PCICR -  Pin Change Interrupt Control Register
+*   PCIE0 - Pin Change Interrupt Enable 0 - Port B (D8-D13)
+*   PCIE1 - Pin Change Interrupt Enable 1 - Port C (A0-A5)
+*   PCIE2 - Pin Change Interrupt Enable 2 - Port D (D0-D7)
+*   Date : 05 May 2018
+*       iam getting a offset of pitch 0.03 and  roll 0.87 - so subtracting those offset values
 */
-
-
-//PCMSKx - Pin Change Mask Register
-//PCMSK0 - portB (D8-D13) (PCINT0  - PCINT6)
-//PCMSK1 - portC (A0-A5)  (PCINT8  - PCINT14)
-//PCMSK2 - portD (D0-D7)  (PCINT16 - PCINT23)
-//PCICR -  Pin Change Interrupt Control Register
-//  PCIE0 - Pin Change Interrupt Enable 0 - Port B (D8-D13)
-//  PCIE1 - Pin Change Interrupt Enable 1 - Port C (A0-A5)
-//  PCIE2 - Pin Change Interrupt Enable 2 - Port D (D0-D7)
-
 #include<Servo.h>
 #include <PID_v1.h> //PID Library by Brett Beauregard ref:https://github.com/br3ttb/Arduino-PID-Library
 
@@ -65,11 +65,29 @@
 #include <helper_3dmath.h>
 #include <MPU6050_6Axis_MotionApps20.h>
 
+// There may be some conflict with softwareSerial and Servo Library So Hc-05 will be using Hardware Serial
+//#include <SoftwareSerial.h> //Software Serial Library for HC-05 Bluetooth Module - this module act as a Slave and sends the data to the master or receive the data from master
+//SoftwareSerial BTSerial(A0,A1); // TX, RX
 
-#include <SoftwareSerial.h> //Software Serial Library for HC-05 Bluetooth Module - this module act as a Slave and sends the data to the master or receive the data from master
-SoftwareSerial BTSerial(A0,A1); // TX, RX
+//#define DEBUG
+#define TUNING
 
-#define DEBUG
+
+//required parameters for tuning
+
+#ifdef TUNING
+#define MAX_DATA_LENGTH 100
+char startingChar = '<';
+char endingChar = '>';
+boolean storeRecvData = false;
+char recvDataBuffer[MAX_DATA_LENGTH];
+char strtokDelimiter[] = ",";
+int index = 0; 
+float pp,pd,pi,rp,rd,ri,yp,yd,yi; //pid constants for pitch,roll,yaw
+
+unsigned long btDataStartMillis = millis();
+#define DATA_INTERVAL 100
+#endif
 
 //MotorConnections
 #define m0 4
@@ -92,17 +110,17 @@ SoftwareSerial BTSerial(A0,A1); // TX, RX
   * 13 Apr 2018 
   * Changed #defined to float to change pid parameters using bluetooth
 */
-float pitchPVal 0.5
-float pitchDVal 0
-float pitchIVal 0
+#define pitchPVal 0.5
+#define pitchDVal 0.24
+#define pitchIVal 0.04
 
-#define rollPVal 0
-#define rollDVal 0
-#define rollIVal 0
+#define rollPVal 0.5
+#define rollDVal 0.24
+#define rollIVal 0.04
 
-#define yawPVal 0
-#define yawDVal 0
-#define yawIVal 0
+#define yawPVal 0.5
+#define yawDVal 0.24
+#define yawIVal 0.04
 
 
 //Flight Parameters
@@ -110,9 +128,18 @@ float pitchIVal 0
 #define pitchMax 90
 #define rollMin -90
 #define rollMax 90
-#define yawMin -180
-#define yawMax 180
+#define yawMin -90
+#define yawMax 90
 
+
+/*
+ * Date : 05 May 2018
+ * Adding pitch and yaw offsets
+ * 
+*/
+
+#define PID_PITCH_OFFSET 0
+#define PID_ROLL_OFFSET 0
 
 //#define pidPitchInfluence 20
 //#define pidRollInfluence 20
@@ -120,13 +147,13 @@ float pitchIVal 0
 
 
 //MPU 6050 Offsets
-#define mpuGyroXOffset 98
-#define mpuGyroYOffset 20
-#define mpuGyroZOffset 34
+#define mpuGyroXOffset 91
+#define mpuGyroYOffset 29
+#define mpuGyroZOffset 6
 
-#define mpuAccelXOffset -1034
-#define mpuAccelYOffset -571
-#define mpuAccelZOffset 884
+#define mpuAccelXOffset -1037
+#define mpuAccelYOffset -609
+#define mpuAccelZOffset 868
 
 
 volatile boolean recvPCInt = false;
@@ -234,27 +261,27 @@ void updateMotors() {
      int m1Value = throttle - pidRollOut; //+ pidYawOut;
      int m2Value = throttle + pidPitchOut; //- pidYawOut;
      int m3Value = throttle + pidRollOut; //+ pidYawOut;
-
-    BTSerial.print("<");
-    BTSerial.print(m0Value);
-    BTSerial.print(",");
-    BTSerial.print(m1Value);
-    BTSerial.print(",");
-    BTSerial.print(m2Value);
-    BTSerial.print(",");
-    BTSerial.print(m3Value);
-    BTSerial.print(",");
-    BTSerial.print(pidYawIn);
-    BTSerial.print(",");
-    BTSerial.print(pidPitchIn);
-    BTSerial.print(",");
-    BTSerial.print(pidRollIn);
-    BTSerial.print(",");
-    BTSerial.print(pidPitchOut);
-    BTSerial.print(",");
-    BTSerial.print(pidRollOut);
-    BTSerial.println(">");
-
+  #ifdef DEBUG
+    Serial.print("<");
+    Serial.print(m0Value);
+    Serial.print(",");
+    Serial.print(m1Value);
+    Serial.print(",");
+    Serial.print(m2Value);
+    Serial.print(",");
+    Serial.print(m3Value);
+    Serial.print(",");
+    Serial.print(pidYawIn);
+    Serial.print(",");
+    Serial.print(pidPitchIn);
+    Serial.print(",");
+    Serial.print(pidRollIn);
+    Serial.print(",");
+    Serial.print(pidPitchOut);
+    Serial.print(",");
+    Serial.print(pidRollOut);
+    Serial.println(">");
+  #endif
     motor0.write(m0Value);
     motor1.write(m1Value);
     motor2.write(m2Value);
@@ -354,9 +381,9 @@ void initPID() {
   rollController.SetMode(AUTOMATIC);
   pitchController.SetMode(AUTOMATIC);
   yawController.SetMode(AUTOMATIC);
-//  rollController.SetSampleTime(10);
-//  pitchController.SetSampleTime(10);
-//  yawController.SetSampleTime(10);
+  rollController.SetSampleTime(10);
+  pitchController.SetSampleTime(10);
+  yawController.SetSampleTime(10);
 
 #ifdef DEBUG
   Serial.println("pid initialisation completed");
@@ -367,6 +394,10 @@ void computePID() {
   pidYawIn = ypr[0]*180/M_PI; //Converts Radians to degrees ref - https://forum.arduino.cc/index.php?topic=446713.msg3078076#msg3078076
   pidPitchIn = ypr[2]*180/M_PI; //Changed 1 to 2 Due to some problem in Orientation or sensor ? NEED TO FIX IT
   pidRollIn = ypr[1]*180/M_PI;
+
+  //Applying Offsets which are causing the drift
+  pidPitchIn = pidPitchIn - PID_PITCH_OFFSET;
+  pidRollIn = pidRollIn - PID_ROLL_OFFSET;
   
   #ifdef DEBUG
     Serial.print("y p r ");
@@ -381,10 +412,99 @@ void computePID() {
   yawController.Compute();
 }//end of computePID
 
+#ifdef TUNING
+void processReceivedData(){
+  char * strtokIndex ; //this is used by strtok() as index
+    strtokIndex = strtok(recvDataBuffer,strtokDelimiter);// get the first part - pp
+    pp = atof(strtokIndex); // convert to float and store
+    strtokIndex = strtok(NULL,strtokDelimiter); // this continues where the previous call left off - get pd
+    pd = atof(strtokIndex);
+    strtokIndex = strtok(NULL,strtokDelimiter); // get pi
+    pi = atof(strtokIndex);
+    strtokIndex = strtok(NULL,strtokDelimiter); // get rp
+    rp = atof(strtokIndex);
+    strtokIndex = strtok(NULL,strtokDelimiter); // get rd
+    rd = atof(strtokIndex);
+    strtokIndex = strtok(NULL,strtokDelimiter); // get ri
+    ri = atof(strtokIndex); 
+    strtokIndex = strtok(NULL,strtokDelimiter); // get yp
+    yp = atof(strtokIndex); 
+    strtokIndex = strtok(NULL,strtokDelimiter); // get yd
+    yd = atof(strtokIndex);
+    strtokIndex = strtok(NULL,strtokDelimiter); // get yi
+    yi = atof(strtokIndex); 
+
+
+  Serial.print("pp");
+  Serial.print(pp);
+  Serial.print("pi");
+  Serial.print(pi);
+  Serial.print("pd");
+  Serial.println(pd);
+   Serial.print("rp");
+  Serial.print(rp);
+  Serial.print("ri");
+  Serial.print(ri);
+  Serial.print("rd");
+  Serial.println(rd);
+   Serial.print("yp");
+  Serial.print(yp);
+  Serial.print("yi");
+  Serial.print(yi);
+  Serial.print("yd");
+  Serial.println(yd);
+
+  setModifiedTunings();//add tuning parameters to PID
+
+}//end of processReceivedData
+
+void setModifiedTunings(){
+  pitchController.SetTunings(pp,pi,pd);
+  rollController.SetTunings(rp,ri,rd);
+  yawController.SetTunings(yp,yi,yd);
+}//end of setModifiedTunings
+
 
 void checkForBTInput(){
-  
+  if(Serial.available()){
+    //Serial.write(BTSerial.read());
+    char recvChar = Serial.read();
+
+    if(recvChar == startingChar){
+      storeRecvData = true;
+      index = 0; //set the index back to starting
+    }//end of if
+    
+    if(recvChar == endingChar){
+      storeRecvData = false;
+      recvDataBuffer[index] = 0; //null terminating the string
+      //Serial.println(recvDataBuffer);
+      processReceivedData();
+    }//end of if
+
+    if(storeRecvData == true){
+      if(recvChar != startingChar) {
+      recvDataBuffer[index] = recvChar; //store the received char in buffer
+      index = index + 1; //increment the index
+    }//end of if Dumb Workaroung
+    }
+    
+  }//end of If  
 }//end of checkForBTInput
+#endif
+
+
+void sendBTOutput(){
+  if(millis() - btDataStartMillis > DATA_INTERVAL){
+    btDataStartMillis = millis();
+    Serial.print("y:p:r  ");
+    Serial.print(pidYawIn);
+    Serial.print(":");
+    Serial.print(pidPitchIn);
+    Serial.print(":");
+    Serial.println(pidRollIn);
+}//end of IF
+}//end of sendBTOutput Fcn
 
 void setup() {
   cli(); //Clear all interrupts
@@ -393,14 +513,13 @@ void setup() {
   sei(); //enable all interrupts
   pinMode(10, INPUT);
   digitalWrite(10, HIGH); //enable pull up in pin
-//#ifdef DEBUG
-  Serial.begin(115200);
-//#endif
-  BTSerial.begin(38400); // HC-05 Default baudrate
+  Serial.begin(38400); //hc-05 is using hardware serial , 38400 is HC-05 Default Baud Rate
+
   initializeMotors();
   armAllMotors();
   initMPU();
   initPID();
+  
 }//end of setup
 
 void loop() {
@@ -413,6 +532,9 @@ void loop() {
   updateAnglesFromMPU();
   computePID();
   updateMotors();
+  #ifdef TUNING
   checkForBTInput();
+  sendBTOutput();
+  #endif
 }//end of loop
 
