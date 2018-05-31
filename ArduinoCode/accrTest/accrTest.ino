@@ -78,8 +78,3 @@ void configureMPU(){
   Wire.endTransmission();
 }//end of setUpMPU Fcn
 
-unsigned long squared(int v){
-  return v * v;
-}
-
-
