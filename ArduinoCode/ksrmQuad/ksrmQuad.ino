@@ -42,6 +42,8 @@
 // So if you are planning for more serial devices go for Arduino Mega
 // I use bluetooth to get flight parameters - it will be used with Hardware Serial
 #include<PID_v1.h> //PID Library by Brett Beauregard ref:https://github.com/br3ttb/Arduino-PID-Library
+#include<Wire.h> //used for MPU6050
+#include<math.h> //used in accr angle calculation check accrTest for more info
 
 #define DEBUG // when Arduino Connected to computer
 #define TUNING // used for tuning purpose
@@ -106,10 +108,42 @@
 
 #define chMid 1500
 
+
+//variables used for MPU6050 angle calculation
+const float GYRO_SENSITIVITY_SCALE_FACTOR = 131.0; //for 200 degrees / sec
+const long ACCR_SENSITIVITY_SCALE_FACTOR = 16384.0; // for 2g
+
+//MPU6050 i2c address
+const int MPU6050_ADDR = 0b1101000;
+//MPU6050 Register Addresses
+const byte PWR_REG_ADDR = 0x6B;
+const byte GYRO_CONFIG_REG_ADDR = 0x1B;
+//const byte GYRO_READ_START_ADDR = 0x43;
+const byte ACCR_CONFIG_REG_ADDR = 0x1C;
+const byte ACCR_READ_START_ADDR = 0x3B;
+
+const float radToDegreeConvert = 180.0/PI;
+
+int16_t accX,accY,accZ,gyroX,gyroY,gyroZ,tmp; //used to store the data from MPU registers
+double rotX,rotY; //for Gyro's
+double angleX,angleY;//for Accer
+double compAngleX,compAngleY;//for complimentary filter
+
+unsigned long prevTime=0,currentTime; //to calculate dt for gyro integration
+
+//offset variables
+float gyroOffsetValX=0,gyroOffsetValY=0;
+float accrOffsetValX=0,accrOffsetValY = 0;
+
+const int noOfSamplesForOffset = 400;
+
+
+//variables used in pinChange ISR
 volatile boolean recvPCInt = false;
 volatile boolean armMotors = false;
 boolean motorsArmed = false;
 
+//servo instansces for motors
 Servo motor0;
 Servo motor1;
 Servo motor2;
@@ -121,12 +155,13 @@ double pidPitchIn, pidPitchOut, pidPitchSetPoint = 0; //though in UNO there is n
 double pidRollIn, pidRollOut, pidRollSetPoint = 0;
 double pidYawIn, pidYawOut, pidYawSetPoint = 0;
 
+//variables to store the motor values calculated using pid and throttle
 int m0Value, m1Value, m2Value, m3Value;
 
 //PID Instances
 PID pitchController(&pidPitchIn, &pidPitchOut, &pidPitchSetPoint, pitchPVal, pitchIVal, pitchDVal, DIRECT); //what is that reverse and forward ?
 PID rollController(&pidRollIn, &pidRollOut, &pidRollSetPoint, rollPVal, rollIVal, rollDVal, DIRECT);
-PID yawController(&pidYawIn, &pidYawOut, &pidYawSetPoint, yawPVal, yawIVal, yawDVal, DIRECT);
+//PID yawController(&pidYawIn, &pidYawOut, &pidYawSetPoint, yawPVal, yawIVal, yawDVal, DIRECT);
 
 
 //used to store the pwm duration
@@ -209,11 +244,13 @@ void initializeMotors() {
   Serial.println(F("motors initialized"));
 }//end of initializeMotors Fcn
 
+
 void detachMotors(){
   motor0.detach();
   motor1.detach();
   motor2.detach();
   motor3.detach();
+  Serial.println(F("motors detached"));
 }// end of detachMotors Fcn
 
 
@@ -235,17 +272,19 @@ void disArmMotors(){
   Serial.println(F("motors are disarmed "));
 }//end of disArmMotors Fcn
 
+//get register values from mpu6050 and calculate angles based on complementary filter
 void updateAnglesFromMPU(){
-  //NEED TO ADD COMPLEMENTARY CODE HERE
+  readMPU();
+  calculateAngles();
 }//end of updateAnglesFromMPU Fcn
 
 void initPID() {
   rollController.SetOutputLimits(rollMin, rollMax);
   pitchController.SetOutputLimits(pitchMin, pitchMax);
-  yawController.SetOutputLimits(yawMin, yawMax);
+//  yawController.SetOutputLimits(yawMin, yawMax);
   rollController.SetMode(AUTOMATIC);
   pitchController.SetMode(AUTOMATIC);
-  yawController.SetMode(AUTOMATIC);
+//  yawController.SetMode(AUTOMATIC);
 //  rollController.SetSampleTime(10);
 //  pitchController.SetSampleTime(10);
 //  yawController.SetSampleTime(10);
@@ -270,15 +309,13 @@ void setPointUpdate() {
 
 
 void computePID() {
-  //NEED TO UPDATE CODE USING COMPLEMENTARY FILTER
-//  pidYawIn = ypr[0] * 180 / M_PI; //Converts Radians to degrees ref - https://forum.arduino.cc/index.php?topic=446713.msg3078076#msg3078076
-//  pidPitchIn = ypr[2] * 180 / M_PI; //Changed 1 to 2 Due to some problem in Orientation or sensor ? NEED TO FIX IT
-//  pidRollIn = ypr[1] * 180 / M_PI;
+  pidPitchIn = compAngleX;
+  pidRollIn = compAngleY;
   setPointUpdate();
   //compute the setPoint
   rollController.Compute();
   pitchController.Compute();
-  yawController.Compute();
+//  yawController.Compute();
 
 }//end of computePID Fcn
 
@@ -322,7 +359,7 @@ void processReceivedData() {
 void setModifiedTunings() {
   pitchController.SetTunings(pp, pi, pd);
   rollController.SetTunings(rp, ri, rd);
-  yawController.SetTunings(yp, yi, yd);
+//  yawController.SetTunings(yp, yi, yd);
 }//end of setModifiedTunings
 
 
@@ -391,8 +428,122 @@ void initReceiver(){
   }//end of for loop
 }//end of initReceiver Fcn
 
+
+void configureMPU(){
+  //Power Register
+  Wire.beginTransmission(MPU6050_ADDR);
+  Wire.write(PWR_REG_ADDR);//Access the power register
+  Wire.write(0b00000000);//check datasheet 
+  Wire.endTransmission();
+
+  //Gyro Config
+  Wire.beginTransmission(MPU6050_ADDR);
+  Wire.write(ACCR_CONFIG_REG_ADDR);
+  Wire.write(0b00000000);//check data sheet for more info
+  Wire.endTransmission();
+
+  //Accr Config
+  Wire.beginTransmission(MPU6050_ADDR);
+  Wire.write(ACCR_CONFIG_REG_ADDR);
+  Wire.write(0b00000000);//check datasheet for more info
+  Wire.endTransmission();
+}//end of setUpMPU Fcn
+
+void readMPU(){
+//  Serial.println("begin tx");
+   Wire.beginTransmission(MPU6050_ADDR);
+  Wire.write(ACCR_READ_START_ADDR);  // starting with register 0x3B (ACCEL_XOUT_H)
+  Wire.endTransmission(false);
+//  Serial.println("request from");
+  Wire.requestFrom(MPU6050_ADDR,14,true);
+//  Serial.println("request completed");
+  accX=Wire.read()<<8|Wire.read(); 
+  accY=Wire.read()<<8|Wire.read(); 
+  accZ=Wire.read()<<8|Wire.read(); 
+  tmp = Wire.read()<<8|Wire.read();
+  gyroX = Wire.read()<<8|Wire.read();
+  gyroY = Wire.read()<<8|Wire.read();
+  gyroZ = Wire.read()<<8|Wire.read();
+
+  //apply scale factor for gyro reading
+  rotX = gyroX / GYRO_SENSITIVITY_SCALE_FACTOR;
+  rotY = gyroY / GYRO_SENSITIVITY_SCALE_FACTOR;
+
+//  Serial.println("read mpu completed ");
+
+}//end of readGyroX Fcn
+
+/*
+ * This Fcn will calculate offset and set initial value of gyro 
+ * complementary values
+ */
+
+void calculateOffsets(){
+  float gyroTotalValX = 0, gyroTotalValY = 0;
+  float accrTotalValX = 0, accrTotalValY = 0;
+  for (int i=0 ; i < noOfSamplesForOffset ; i++){
+    readMPU();
+    gyroTotalValX = gyroTotalValX + rotX;
+    gyroTotalValY = gyroTotalValY + rotY;
+    //angles from accr
+    angleX = atan(accX/sqrt(pow(accY,2) + pow(accZ,2))) * radToDegreeConvert;
+    angleY = atan(accY/sqrt(pow(accX,2) + pow(accZ,2))) * radToDegreeConvert;
+    accrTotalValX = accrTotalValX + angleX;
+    accrTotalValY = accrTotalValY + angleY;
+    Serial.println("..........");
+  }//end of for loop
+  gyroOffsetValX = gyroTotalValX / noOfSamplesForOffset;
+  gyroOffsetValY = gyroTotalValY / noOfSamplesForOffset;
+
+  accrOffsetValX = accrTotalValX / noOfSamplesForOffset;
+  accrOffsetValY = accrTotalValY / noOfSamplesForOffset;
+
+  //read again to get current values
+  readMPU();
+  angleX = atan(accX/sqrt(pow(accY,2) + pow(accZ,2))) * radToDegreeConvert;
+  angleY = atan(accY/sqrt(pow(accX,2) + pow(accZ,2))) * radToDegreeConvert;
+
+  //apply offsets to accr values
+  angleX = angleX - accrOffsetValX;
+  angleY = angleY - accrOffsetValY;
+
+  //set initial values for gyro and complementary filter
+  rotX = angleX;
+  rotY = angleY;
+  compAngleX = angleX;
+  compAngleY = angleY;
+  
+}//end of calculateGyroOffsets Fcn
+
+/*
+ * This Fcn will calculate the angles using complementary filter
+ */
+
+void calculateAngles(){
+  //angles from accr
+  angleX = atan(accX/sqrt(pow(accY,2) + pow(accZ,2)))*radToDegreeConvert;
+  angleY = atan(accY/sqrt(pow(accX,2) + pow(accZ,2)))*radToDegreeConvert;
+
+  //apply offsets to accr values
+  angleX = angleX - accrOffsetValX;
+  angleY = angleY - accrOffsetValY;
+  
+  currentTime = millis();
+  double dt = (currentTime - prevTime)/1000;
+  prevTime = currentTime;
+  //The Mighty Complementary filter
+   compAngleX = 0.99 * (compAngleX + (rotX - gyroOffsetValX) * dt) + 0.01 * angleX; 
+   compAngleY = 0.99 * (compAngleY + (rotY - gyroOffsetValY) * dt) + 0.01 * angleY;
+}//end of calculateAngles Fcn
+
+
+
+/*
+ * In this fuction we configure mpu6050 and calculate offsets i.e calibration
+ */
 void initMPU6050(){
-  //NEED TO ADD MPU6050 Complementary code here
+  configureMPU();
+  calculateOffsets();
 }//end of initMPU6050 Fcn
 
 void setup() {
@@ -400,6 +551,7 @@ void setup() {
   Serial.begin(38400); //HC-05 is using hardware serial , 38400 is HC-05 Default Baud Rate
   initMPU6050();
   initPID();
+  prevTime = millis(); //used to calculate dt for gyro integration
 }//end of setup Fcn
 
 void loop() {
@@ -423,7 +575,6 @@ if(armMotors == true){
 }//end of armMotors 
 #ifdef TUNING
   checkForBTInput();
-  sendBTOutput();
-#endif
-  
+ #endif
+  sendBTOutput(); 
 }//end of loop Fcn
