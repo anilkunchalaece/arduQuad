@@ -189,6 +189,16 @@ yi.setSingleStep(0.01)
 yd = QtGui.QDoubleSpinBox()
 yd.setSingleStep(0.01)
 
+def setTuningsBtnClicked():
+    print("set tunings clicked")
+    valToSend = "<"+str(pp.value())+","+str(pd.value())+","+str(pi.value())+","
+    valToSend = valToSend + str(rp.value()) + ","+str(rd.value())+","+str(ri.value())+","
+    valToSend = valToSend + str(yp.value()) + ","+str(yd.value())+","+str(yi.value())+ ">\r\n"
+    print valToSend
+    arduinoData.write(valToSend)
+
+setTuningsBtn = QtGui.QPushButton("Set PID")
+setTuningsBtn.clicked.connect(setTuningsBtnClicked)
 
 rawData = QtGui.QLabel("Raw Data From Quad")
 rawDataString = QtGui.QLabel()
@@ -212,6 +222,9 @@ pidDataLayout.addWidget(ylabel,0,3)
 pidDataLayout.addWidget(yp,1,3)
 pidDataLayout.addWidget(yi,2,3)
 pidDataLayout.addWidget(yd,3,3)
+
+pidDataLayout.addWidget(setTuningsBtn,1,5,3,1,Qt.AlignCenter)
+
 pidDataLayout.addWidget(rawData,4,0,1,3)
 pidDataLayout.addWidget(rawDataString,5,0,1,3)
 #Display widget as a new window
@@ -277,10 +290,22 @@ def checkForReadings(data):
     m1 = re.findall(r"m1-([-+]?\d*\.\d+|\d+)>",data)
     m2 = re.findall(r"m2-([-+]?\d*\.\d+|\d+)>",data)
     m3 = re.findall(r"m3-([-+]?\d*\.\d+|\d+)>",data)
-    rr = re.findall(r"c0([-+]?\d*\.\d+|\d+)>",data)
-    rp = re.findall(r"c1([-+]?\d*\.\d+|\d+)>",data)
-    rt = re.findall(r"c2([-+]?\d*\.\d+|\d+)>",data)
-    ry = re.findall(r"c3([-+]?\d*\.\d+|\d+)>",data)
+    rR = re.findall(r"c0([-+]?\d*\.\d+|\d+)>",data)
+    rP = re.findall(r"c1([-+]?\d*\.\d+|\d+)>",data)
+    rT = re.findall(r"c2([-+]?\d*\.\d+|\d+)>",data)
+    rY = re.findall(r"c3([-+]?\d*\.\d+|\d+)>",data)
+
+    ppVal = re.findall(r"@pp([-+]?\d*\.\d+|\d+)>",data)
+    piVal = re.findall(r"@pi([-+]?\d*\.\d+|\d+)>",data)
+    pdVal = re.findall(r"@pd([-+]?\d*\.\d+|\d+)>",data)
+    
+    rpVal = re.findall(r"@rp([-+]?\d*\.\d+|\d+)>",data)
+    riVal = re.findall(r"@ri([-+]?\d*\.\d+|\d+)>",data)
+    rdVal = re.findall(r"@rd([-+]?\d*\.\d+|\d+)>",data)
+    
+    ypVal = re.findall(r"@yp([-+]?\d*\.\d+|\d+)>",data)
+    yiVal = re.findall(r"@yi([-+]?\d*\.\d+|\d+)>",data)
+    ydVal = re.findall(r"@yd([-+]?\d*\.\d+|\d+)>",data)
 
     if len(p) > 0 and len(ps) > 0:
     	pitchVal.append(float(p[0]))
@@ -324,21 +349,50 @@ def checkForReadings(data):
             m2Val.pop(0)
             m3Val.pop(0) 
 
-    if len(rr) > 0 :
-        ch1InstLable.setText('CH1 --> '+rr[0])
-    if len(rp) > 0 :
-        ch2InstLable.setText('CH2 --> '+rp[0])
-    if len(rt) > 0 :
-        ch3InstLable.setText('CH3 --> '+rt[0])
-    if len(ry) > 0 :
-        ch4InstLable.setText('CH4 --> '+ry[0])
+    if len(rR) > 0 :
+        ch1InstLable.setText('CH1 --> '+rR[0])
+    if len(rP) > 0 :
+        ch2InstLable.setText('CH2 --> '+rP[0])
+    if len(rT) > 0 :
+        ch3InstLable.setText('CH3 --> '+rT[0])
+    if len(rY) > 0 :
+        ch4InstLable.setText('CH4 --> '+rY[0])
     if len(po) > 0 :
         pitchPIDOutInstLable.setText('Pitch PID Out --> '+po[0])
     if len(ro) > 0 :
         rollPIDOutInstLable.setText('Roll PID Out --> '+ro[0])
     if len(yo) > 0:
         yawPIDOutInstLable.setText('Yaw PID Out --> '+yo[0])
-    print [y,p,r,ps,rs,po,ro,m0,m1,m2,m3]
+
+    if len(ppVal) > 0:
+        print "pp-" + str(ppVal[0]) + " ", # comma is used to not to print new line
+        pp.setValue(float(ppVal[0]))
+    if len(piVal) > 0:
+        print "pi-" + str(piVal[0]) + " ", # comma is used to not to print new line
+        pi.setValue(float(piVal[0]))
+    if len(pdVal) > 0:
+        print "pd-" + str(pdVal[0]) + " ", # comma is used to not to print new line
+        pd.setValue(float(pdVal[0]))
+    if len(rpVal) > 0:
+        print "rp-" + str(rpVal[0]) + " ", # comma is used to not to print new line
+        rp.setValue(float(rpVal[0]))
+    if len(riVal) > 0:
+        print "ri-" + str(riVal[0]) + " ", # comma is used to not to print new line
+        ri.setValue(float(riVal[0]))
+    if len(rdVal) > 0:
+        print "rd-" + str(rdVal[0]) + " ", # comma is used to not to print new line
+        rd.setValue(float(rdVal[0]))
+    if len(ypVal) > 0:
+        print "yp-" + str(ypVal[0]) + " ", # comma is used to not to print new line
+        yp.setValue(float(ypVal[0]))
+    if len(yiVal) > 0:
+        print "ri-" + str(yiVal[0]) + " ", # comma is used to not to print new line
+        yi.setValue(float(yiVal[0]))
+    if len(ydVal) > 0:
+        print "yd-" + str(ydVal[0]) + " ", # comma is used to not to print new line
+        yd.setValue(float(ydVal[0]))                 
+    # print [y,p,r,ps,rs,po,ro,m0,m1,m2,m3]
+
 
 def checkData():
     # print "check data"
@@ -350,6 +404,7 @@ def checkData():
     rawDataString.setText(recvString) 
     checkForReadings(recvString)
     app.processEvents()
+
 
 #start qt event loop
 app.processEvents()

@@ -12,7 +12,7 @@ SoftwareSerial BTSerial(3,4); // TX, RX
 
 #define p 0.5
 #define d 0.24
-#define i 0.03
+#define i 0.0
 
 #define pp p
 #define pi i
@@ -27,29 +27,29 @@ SoftwareSerial BTSerial(3,4); // TX, RX
 #define yd 0
 
 void setup() {
-Serial.begin(9600);
+Serial.begin(115200);
 Serial.println("AT MODE");
 BTSerial.begin(38400); //HC-5 Default Speed in AT Mode
 
-BTSerial.print("<");
-BTSerial.print(pp);
-BTSerial.print(",");
-BTSerial.print(pd);
-BTSerial.print(",");
-BTSerial.print(pi);
-BTSerial.print(",");
-BTSerial.print(rp);
-BTSerial.print(",");
-BTSerial.print(rd);
-BTSerial.print(",");
-BTSerial.print(ri);
-BTSerial.print(",");
-BTSerial.print(yp);
-BTSerial.print(",");
-BTSerial.print(yd);
-BTSerial.print(",");
-BTSerial.print(yi);
-BTSerial.print(">");
+//BTSerial.print("<");
+//BTSerial.print(pp);
+//BTSerial.print(",");
+//BTSerial.print(pd);
+//BTSerial.print(",");
+//BTSerial.print(pi);
+//BTSerial.print(",");
+//BTSerial.print(rp);
+//BTSerial.print(",");
+//BTSerial.print(rd);
+//BTSerial.print(",");
+//BTSerial.print(ri);
+//BTSerial.print(",");
+//BTSerial.print(yp);
+//BTSerial.print(",");
+//BTSerial.print(yd);
+//BTSerial.print(",");
+//BTSerial.print(yi);
+//BTSerial.print(">");
 
 }
 
@@ -57,6 +57,10 @@ void loop(){
 // BTSerial.println("<1.2,1.3,1.4,1,1,1,1,1,1>");
 if(BTSerial.available()){
   Serial.write(BTSerial.read());
+}
+
+if(Serial.available()){
+    BTSerial.print(Serial.readString());
 }
 }
 
