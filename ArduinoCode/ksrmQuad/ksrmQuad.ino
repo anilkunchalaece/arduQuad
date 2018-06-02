@@ -45,24 +45,23 @@
 #include<Wire.h> //used for MPU6050
 #include<math.h> //used in accr angle calculation check accrTest for more info
 
-#define DEBUG // when Arduino Connected to computer
 #define TUNING // used for tuning purpose
-#define FLIGHT_PARAMETERS // to get flight parameters
 
 //tuning variables
 #ifdef TUNING
   #define MAX_DATA_LENGTH 100
-  #define DATA_INTERVAL 200
   char startingChar = '<';
   char endingChar = '>';
   boolean storeRecvData = false;
   char recvDataBuffer[MAX_DATA_LENGTH];
   char strtokDelimiter[] = ","; //used to parse the data
   int index = 0;
-  float pp, pd, pi, rp, rd, ri, yp, yd, yi; //pid constants for pitch,roll,yaw
-  unsigned long btDataStartMillis = millis();
+  float pp, pd, pi, rp, rd, ri, yp, yd, yi; //pid constants for pitch,roll,yaw 
 #endif
 
+//used to send bluetooth debug info 
+#define DATA_INTERVAL 150
+unsigned long btDataStartMillis = millis();
 
 //MotorConnections
 #define m0 4
@@ -81,11 +80,11 @@
 
 //PID Constants
 
-#define pitchPVal 0.7
-#define pitchDVal 0.25
+#define pitchPVal 0.5
+#define pitchDVal 0.24
 #define pitchIVal 0.0
 
-#define rollPVal 0.7
+#define rollPVal 0.5
 #define rollDVal 0.25
 #define rollIVal 0.0
 
@@ -227,10 +226,10 @@ void updateMotors(){
     if (m3Value < motorArmValue) m3Value = motorArmValue+50;
 
     //send the values to esc
-    motor0.write(m0Value);
-    motor1.write(m1Value);
-    motor2.write(m2Value);
-    motor3.write(m3Value);
+    motor0.writeMicroseconds(m0Value);
+    motor1.writeMicroseconds(m1Value);
+    motor2.writeMicroseconds(m2Value);
+    motor3.writeMicroseconds(m3Value);
     
 }//end of updateMotors Fcn
 
@@ -255,20 +254,20 @@ void detachMotors(){
 
 
 void armAllMotors() {
-  motor0.write(motorArmValue);
-  motor1.write(motorArmValue);
-  motor2.write(motorArmValue);
-  motor3.write(motorArmValue);
+  motor0.writeMicroseconds(motorArmValue);
+  motor1.writeMicroseconds(motorArmValue);
+  motor2.writeMicroseconds(motorArmValue);
+  motor3.writeMicroseconds(motorArmValue);
   delay(motorArmDelay);
   Serial.println(F("motors are Armed "));
 }//end of armAllMotors Fcn
 
 
 void disArmMotors(){
-  motor0.write(motorArmValue - 100);
-  motor1.write(motorArmValue - 100);
-  motor2.write(motorArmValue - 100);
-  motor3.write(motorArmValue - 100);
+  motor0.writeMicroseconds(motorArmValue - 100);
+  motor1.writeMicroseconds(motorArmValue - 100);
+  motor2.writeMicroseconds(motorArmValue - 100);
+  motor3.writeMicroseconds(motorArmValue - 100);
   Serial.println(F("motors are disarmed "));
 }//end of disArmMotors Fcn
 
@@ -309,8 +308,8 @@ void setPointUpdate() {
 
 
 void computePID() {
-  pidPitchIn = compAngleX;
-  pidRollIn = compAngleY;
+  pidPitchIn = compAngleY;
+  pidRollIn = compAngleX;
   setPointUpdate();
   //compute the setPoint
   rollController.Compute();
@@ -353,7 +352,7 @@ void processReceivedData() {
   Serial.print(F("yi")); Serial.print(yi);Serial.print(F(","));
   Serial.print(F("yd")); Serial.print(yd);Serial.print(F(","));
   Serial.println("");
-  if (pp > 0 && pd > 0 && pi > 0 )  setModifiedTunings();//add tuning parameters to PID if all the pitch pid parameters are positive
+  if (pp > 0 && pd > 0)  setModifiedTunings();//add tuning parameters to PID if all the pitch pid parameters are positive
 }//end of processReceivedData
 
 void setModifiedTunings() {
@@ -395,15 +394,15 @@ void checkForBTInput() {
 void sendBTOutput() {
   if (millis() - btDataStartMillis > DATA_INTERVAL) {
     btDataStartMillis = millis();
-    Serial.print(F("y")); Serial.print(pidYawIn);Serial.print(F(">"));
-    Serial.print(F("p")); Serial.print(pidPitchIn);Serial.print(F(">"));
-    Serial.print(F("r")); Serial.print(pidRollIn);Serial.print(F(">"));
+//    Serial.print(F("y")); Serial.print(pidYawIn);Serial.print(F(">"));
+    Serial.print(F("p")); Serial.print(compAngleX);Serial.print(F(">")); //pidPitchIn
+    Serial.print(F("r")); Serial.print(compAngleY);Serial.print(F(">")); //PidRollIn
     Serial.print(F("ps")); Serial.print(pidPitchSetPoint);Serial.print(F(">"));
     Serial.print(F("rs")); Serial.print(pidRollSetPoint);Serial.print(F(">"));
     Serial.print(F("ys")); Serial.print(pidYawSetPoint);Serial.print(F(">"));
     Serial.print(F("po")); Serial.print(pidPitchOut);Serial.print(F(">"));
     Serial.print(F("ro")); Serial.print(pidRollOut);Serial.print(F(">"));
-    Serial.print(F("yo")); Serial.print(pidYawOut);Serial.print(F(">"));
+//    Serial.print(F("yo")); Serial.print(pidYawOut);Serial.print(F(">"));
     Serial.print(F("m0-")); Serial.print(m0Value);Serial.print(F(">"));
     Serial.print(F("m1-")); Serial.print(m1Value);Serial.print(F(">"));
     Serial.print(F("m2-")); Serial.print(m2Value);Serial.print(F(">"));
@@ -415,6 +414,7 @@ void sendBTOutput() {
     Serial.println("");
   }//end of IF
 }//end of sendBTOutput Fcn
+
 
 void initReceiver(){
   cli(); //Clear all interrupts
@@ -534,6 +534,8 @@ void calculateAngles(){
   //The Mighty Complementary filter
    compAngleX = 0.99 * (compAngleX + (rotX - gyroOffsetValX) * dt) + 0.01 * angleX; 
    compAngleY = 0.99 * (compAngleY + (rotY - gyroOffsetValY) * dt) + 0.01 * angleY;
+
+   
 }//end of calculateAngles Fcn
 
 
@@ -575,6 +577,6 @@ if(armMotors == true){
 }//end of armMotors 
 #ifdef TUNING
   checkForBTInput();
- #endif
-  sendBTOutput(); 
+#endif
+    sendBTOutput();
 }//end of loop Fcn
