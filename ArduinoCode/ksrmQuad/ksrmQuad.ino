@@ -49,17 +49,17 @@
 
 //tuning variables
 #ifdef TUNING
-  #define MAX_DATA_LENGTH 100
-  char startingChar = '<';
-  char endingChar = '>';
-  boolean storeRecvData = false;
-  char recvDataBuffer[MAX_DATA_LENGTH];
-  char strtokDelimiter[] = ","; //used to parse the data
-  int index = 0;
-  float pp, pd, pi, rp, rd, ri, yp, yd, yi; //pid constants for pitch,roll,yaw 
+#define MAX_DATA_LENGTH 100
+char startingChar = '<';
+char endingChar = '>';
+boolean storeRecvData = false;
+char recvDataBuffer[MAX_DATA_LENGTH];
+char strtokDelimiter[] = ","; //used to parse the data
+int index = 0;
+float pp, pd, pi, rp, rd, ri, yp, yd, yi; //pid constants for pitch,roll,yaw
 #endif
 
-//used to send bluetooth debug info 
+//used to send bluetooth debug info
 #define DATA_INTERVAL 150
 unsigned long btDataStartMillis = millis();
 
@@ -121,21 +121,20 @@ const byte GYRO_CONFIG_REG_ADDR = 0x1B;
 const byte ACCR_CONFIG_REG_ADDR = 0x1C;
 const byte ACCR_READ_START_ADDR = 0x3B;
 
-const float radToDegreeConvert = 180.0/PI;
+const float radToDegreeConvert = 180.0 / PI;
 
-int16_t accX,accY,accZ,gyroX,gyroY,gyroZ,tmp; //used to store the data from MPU registers
-double rotX,rotY; //for Gyro's
-double angleX,angleY;//for Accer
-double compAngleX,compAngleY;//for complimentary filter
+int16_t accX, accY, accZ, gyroX, gyroY, gyroZ, tmp; //used to store the data from MPU registers
+double rotX, rotY; //for Gyro's
+double angleX, angleY; //for Accer
+double compAngleX, compAngleY; //for complimentary filter
 
-unsigned long prevTime=0,currentTime; //to calculate dt for gyro integration
+unsigned long prevTime = 0, currentTime; //to calculate dt for gyro integration
 
 //offset variables
-float gyroOffsetValX=0,gyroOffsetValY=0;
-float accrOffsetValX=0,accrOffsetValY = 0;
+float gyroOffsetValX = 0, gyroOffsetValY = 0;
+float accrOffsetValX = 0, accrOffsetValY = 0;
 
 const int noOfSamplesForOffset = 400;
-
 
 //variables used in pinChange ISR
 volatile boolean recvPCInt = false;
@@ -147,7 +146,6 @@ Servo motor0;
 Servo motor1;
 Servo motor2;
 Servo motor3;
-
 
 // PID Variables
 double pidPitchIn, pidPitchOut, pidPitchSetPoint = 0; //though in UNO there is no diff between float and double - PID library throwing error if type is float
@@ -196,13 +194,13 @@ ISR(PCINT0_vect) {
   }//end of for loop
 
   //ARM motors
-  if(pwmDuration[2] < 1250 && pwmDuration[3] > 1700){
+  if (pwmDuration[2] < 1250 && pwmDuration[3] > 1700) {
     //Throttle Min And Yaw Max
     armMotors = true;
   }
 
   //DISARM Motors
-  if(pwmDuration[2] < 1250 && pwmDuration[0] > 1700){
+  if (pwmDuration[2] < 1250 && pwmDuration[0] > 1700) {
     //Throttle Min and Roll Max
     armMotors = false;
   }
@@ -211,26 +209,26 @@ ISR(PCINT0_vect) {
 
 
 //NEED TO CHECK THIS - write or writeMicroSeconds
-void updateMotors(){
- 
-    int throttle = map(pwmDuration[2], throttleMinValue, throttleMaxValue, motorMinValue, motorMaxValue);
-    m0Value = throttle + pidPitchOut; //- pidYawOut;
-    m1Value = throttle + pidRollOut; //+ pidYawOut;
-    m2Value = throttle - pidPitchOut; //- pidYawOut;
-    m3Value = throttle - pidRollOut; //+ pidYawOut;
+void updateMotors() {
 
-     //keep the motors running
-    if (m0Value < motorArmValue) m0Value = motorArmValue+50;
-    if (m1Value < motorArmValue) m1Value = motorArmValue+50;
-    if (m2Value < motorArmValue) m2Value = motorArmValue+50;
-    if (m3Value < motorArmValue) m3Value = motorArmValue+50;
+  int throttle = map(pwmDuration[2], throttleMinValue, throttleMaxValue, motorMinValue, motorMaxValue);
+  m0Value = throttle + pidPitchOut; //- pidYawOut;
+  m1Value = throttle + pidRollOut; //+ pidYawOut;
+  m2Value = throttle - pidPitchOut; //- pidYawOut;
+  m3Value = throttle - pidRollOut; //+ pidYawOut;
 
-    //send the values to esc
-    motor0.writeMicroseconds(m0Value);
-    motor1.writeMicroseconds(m1Value);
-    motor2.writeMicroseconds(m2Value);
-    motor3.writeMicroseconds(m3Value);
-    
+  //keep the motors running
+  if (m0Value < motorArmValue) m0Value = motorArmValue + 50;
+  if (m1Value < motorArmValue) m1Value = motorArmValue + 50;
+  if (m2Value < motorArmValue) m2Value = motorArmValue + 50;
+  if (m3Value < motorArmValue) m3Value = motorArmValue + 50;
+
+  //send the values to esc
+  motor0.writeMicroseconds(m0Value);
+  motor1.writeMicroseconds(m1Value);
+  motor2.writeMicroseconds(m2Value);
+  motor3.writeMicroseconds(m3Value);
+
 }//end of updateMotors Fcn
 
 
@@ -240,16 +238,16 @@ void initializeMotors() {
   motor2.attach(m2);
   motor3.attach(m3);
   disArmMotors(); //we are disarming for safety
-  Serial.println(F("motors initialized"));
+  //Serial.println(F("motors initialized"));
 }//end of initializeMotors Fcn
 
 
-void detachMotors(){
+void detachMotors() {
   motor0.detach();
   motor1.detach();
   motor2.detach();
   motor3.detach();
-  Serial.println(F("motors detached"));
+  //Serial.println(F("motors detached"));
 }// end of detachMotors Fcn
 
 
@@ -259,20 +257,20 @@ void armAllMotors() {
   motor2.writeMicroseconds(motorArmValue);
   motor3.writeMicroseconds(motorArmValue);
   delay(motorArmDelay);
-  Serial.println(F("motors are Armed "));
+  //Serial.println(F("motors are Armed "));
 }//end of armAllMotors Fcn
 
 
-void disArmMotors(){
+void disArmMotors() {
   motor0.writeMicroseconds(motorArmValue - 100);
   motor1.writeMicroseconds(motorArmValue - 100);
   motor2.writeMicroseconds(motorArmValue - 100);
   motor3.writeMicroseconds(motorArmValue - 100);
-  Serial.println(F("motors are disarmed "));
+  //Serial.println(F("motors are disarmed "));
 }//end of disArmMotors Fcn
 
 //get register values from mpu6050 and calculate angles based on complementary filter
-void updateAnglesFromMPU(){
+void updateAnglesFromMPU() {
   readMPU();
   calculateAngles();
 }//end of updateAnglesFromMPU Fcn
@@ -280,13 +278,13 @@ void updateAnglesFromMPU(){
 void initPID() {
   rollController.SetOutputLimits(rollMin, rollMax);
   pitchController.SetOutputLimits(pitchMin, pitchMax);
-//  yawController.SetOutputLimits(yawMin, yawMax);
+  //  yawController.SetOutputLimits(yawMin, yawMax);
   rollController.SetMode(AUTOMATIC);
   pitchController.SetMode(AUTOMATIC);
-//  yawController.SetMode(AUTOMATIC);
-//  rollController.SetSampleTime(10);
-//  pitchController.SetSampleTime(10);
-//  yawController.SetSampleTime(10);
+  //  yawController.SetMode(AUTOMATIC);
+  //  rollController.SetSampleTime(10);
+  //  pitchController.SetSampleTime(10);
+  //  yawController.SetSampleTime(10);
   Serial.println(F("pid initialisation completed"));
 }//end of initPID Fcn
 
@@ -314,7 +312,7 @@ void computePID() {
   //compute the setPoint
   rollController.Compute();
   pitchController.Compute();
-//  yawController.Compute();
+  //  yawController.Compute();
 
 }//end of computePID Fcn
 
@@ -342,23 +340,27 @@ void processReceivedData() {
   strtokIndex = strtok(NULL, strtokDelimiter); // get yi
   yi = atof(strtokIndex);
 
-  Serial.print(F("pp")); Serial.print(pp);Serial.print(F(","));
-  Serial.print(F("pi")); Serial.print(pi);Serial.print(F(","));
-  Serial.print(F("pd")); Serial.println(pd);Serial.print(F(","));
-  Serial.print(F("rp")); Serial.print(rp);Serial.print(F(","));
-  Serial.print(F("ri")); Serial.print(ri);Serial.print(F(","));
-  Serial.print(F("rd")); Serial.print(rd);Serial.print(F(","));
-  Serial.print(F("yp")); Serial.print(yp);Serial.print(F(","));
-  Serial.print(F("yi")); Serial.print(yi);Serial.print(F(","));
-  Serial.print(F("yd")); Serial.print(yd);Serial.print(F(","));
+  Serial.print(F("@pp")); Serial.print(pp); Serial.print(F(">"));
+  Serial.print(F("@pi")); Serial.print(pi); Serial.print(F(">"));
+  Serial.print(F("@pd")); Serial.print(pd); Serial.print(F(">"));
+  Serial.print(F("@rp")); Serial.print(rp); Serial.print(F(">"));
+  Serial.print(F("@ri")); Serial.print(ri); Serial.print(F(">"));
+  Serial.print(F("@rd")); Serial.print(rd); Serial.print(F(">"));
+  Serial.print(F("@yp")); Serial.print(yp); Serial.print(F(">"));
+  Serial.print(F("@yi")); Serial.print(yi); Serial.print(F(">"));
+  Serial.print(F("@yd")); Serial.print(yd); Serial.print(F(">"));
   Serial.println("");
-  if (pp > 0 && pd > 0)  setModifiedTunings();//add tuning parameters to PID if all the pitch pid parameters are positive
+  if (pp > 0 && pd > 0)  
+  {
+    setModifiedTunings();//add tuning parameters to PID if all the pitch pid parameters are positive
+    Serial.println("modified tunings applied");
+  }
 }//end of processReceivedData
 
 void setModifiedTunings() {
   pitchController.SetTunings(pp, pi, pd);
   rollController.SetTunings(rp, ri, rd);
-//  yawController.SetTunings(yp, yi, yd);
+  //  yawController.SetTunings(yp, yi, yd);
 }//end of setModifiedTunings
 
 
@@ -371,7 +373,7 @@ void checkForBTInput() {
       index = 0; //set the index back to starting
     }//end of if
 
-   if (recvChar == endingChar) {
+    if (recvChar == endingChar) {
       storeRecvData = false;
       recvDataBuffer[index] = 0; //null terminating the string
       //Serial.println(recvDataBuffer);
@@ -394,46 +396,46 @@ void checkForBTInput() {
 void sendBTOutput() {
   if (millis() - btDataStartMillis > DATA_INTERVAL) {
     btDataStartMillis = millis();
-//    Serial.print(F("y")); Serial.print(pidYawIn);Serial.print(F(">"));
-    Serial.print(F("p")); Serial.print(compAngleX);Serial.print(F(">")); //pidPitchIn
-    Serial.print(F("r")); Serial.print(compAngleY);Serial.print(F(">")); //PidRollIn
-    Serial.print(F("ps")); Serial.print(pidPitchSetPoint);Serial.print(F(">"));
-    Serial.print(F("rs")); Serial.print(pidRollSetPoint);Serial.print(F(">"));
-    Serial.print(F("ys")); Serial.print(pidYawSetPoint);Serial.print(F(">"));
-    Serial.print(F("po")); Serial.print(pidPitchOut);Serial.print(F(">"));
-    Serial.print(F("ro")); Serial.print(pidRollOut);Serial.print(F(">"));
-//    Serial.print(F("yo")); Serial.print(pidYawOut);Serial.print(F(">"));
-    Serial.print(F("m0-")); Serial.print(m0Value);Serial.print(F(">"));
-    Serial.print(F("m1-")); Serial.print(m1Value);Serial.print(F(">"));
-    Serial.print(F("m2-")); Serial.print(m2Value);Serial.print(F(">"));
-    Serial.print(F("m3-")); Serial.print(m3Value);Serial.print(F(">"));
-    Serial.print(F("c0")); Serial.print(pwmDuration[0]);Serial.print(F(">"));
-    Serial.print(F("c1")); Serial.print(pwmDuration[1]);Serial.print(F(">"));
-    Serial.print(F("c2")); Serial.print(pwmDuration[2]);Serial.print(F(">"));
-    Serial.print(F("c3")); Serial.print(pwmDuration[3]);Serial.print(F(">"));
+    //    Serial.print(F("y")); Serial.print(pidYawIn);Serial.print(F(">"));
+    Serial.print(F("p")); Serial.print(compAngleX); Serial.print(F(">")); //pidPitchIn
+    Serial.print(F("r")); Serial.print(compAngleY); Serial.print(F(">")); //PidRollIn
+    Serial.print(F("ps")); Serial.print(pidPitchSetPoint); Serial.print(F(">"));
+    Serial.print(F("rs")); Serial.print(pidRollSetPoint); Serial.print(F(">"));
+    Serial.print(F("ys")); Serial.print(pidYawSetPoint); Serial.print(F(">"));
+    Serial.print(F("po")); Serial.print(pidPitchOut); Serial.print(F(">"));
+    Serial.print(F("ro")); Serial.print(pidRollOut); Serial.print(F(">"));
+    //    Serial.print(F("yo")); Serial.print(pidYawOut);Serial.print(F(">"));
+    Serial.print(F("m0-")); Serial.print(m0Value); Serial.print(F(">"));
+    Serial.print(F("m1-")); Serial.print(m1Value); Serial.print(F(">"));
+    Serial.print(F("m2-")); Serial.print(m2Value); Serial.print(F(">"));
+    Serial.print(F("m3-")); Serial.print(m3Value); Serial.print(F(">"));
+    Serial.print(F("c0")); Serial.print(pwmDuration[0]); Serial.print(F(">"));
+    Serial.print(F("c1")); Serial.print(pwmDuration[1]); Serial.print(F(">"));
+    Serial.print(F("c2")); Serial.print(pwmDuration[2]); Serial.print(F(">"));
+    Serial.print(F("c3")); Serial.print(pwmDuration[3]); Serial.print(F(">"));
     Serial.println("");
   }//end of IF
 }//end of sendBTOutput Fcn
 
 
-void initReceiver(){
+void initReceiver() {
   cli(); //Clear all interrupts
   PCICR |= 1 << PCIE0; //Enable port B Registers i.e D8-D13
-  PCMSK0 |= 1<< PCINT3 | 1 << PCINT2 | 1 << PCINT1 | 1 << PCINT0 ; // Pin11,10,9,8
+  PCMSK0 |= 1 << PCINT3 | 1 << PCINT2 | 1 << PCINT1 | 1 << PCINT0 ; // Pin11,10,9,8
   sei(); //enable all interrupts
 
-  for (int i = 0 ; i < noOfChannels ; i++){
-    pinMode(rxCh[i],INPUT);
-    digitalWrite(rxCh[i],HIGH); //enable pullup
+  for (int i = 0 ; i < noOfChannels ; i++) {
+    pinMode(rxCh[i], INPUT);
+    digitalWrite(rxCh[i], HIGH); //enable pullup
   }//end of for loop
 }//end of initReceiver Fcn
 
 
-void configureMPU(){
+void configureMPU() {
   //Power Register
   Wire.beginTransmission(MPU6050_ADDR);
   Wire.write(PWR_REG_ADDR);//Access the power register
-  Wire.write(0b00000000);//check datasheet 
+  Wire.write(0b00000000);//check datasheet
   Wire.endTransmission();
 
   //Gyro Config
@@ -449,45 +451,45 @@ void configureMPU(){
   Wire.endTransmission();
 }//end of setUpMPU Fcn
 
-void readMPU(){
-//  Serial.println("begin tx");
-   Wire.beginTransmission(MPU6050_ADDR);
+void readMPU() {
+  //  Serial.println("begin tx");
+  Wire.beginTransmission(MPU6050_ADDR);
   Wire.write(ACCR_READ_START_ADDR);  // starting with register 0x3B (ACCEL_XOUT_H)
   Wire.endTransmission(false);
-//  Serial.println("request from");
-  Wire.requestFrom(MPU6050_ADDR,14,true);
-//  Serial.println("request completed");
-  accX=Wire.read()<<8|Wire.read(); 
-  accY=Wire.read()<<8|Wire.read(); 
-  accZ=Wire.read()<<8|Wire.read(); 
-  tmp = Wire.read()<<8|Wire.read();
-  gyroX = Wire.read()<<8|Wire.read();
-  gyroY = Wire.read()<<8|Wire.read();
-  gyroZ = Wire.read()<<8|Wire.read();
+  //  Serial.println("request from");
+  Wire.requestFrom(MPU6050_ADDR, 14, true);
+  //  Serial.println("request completed");
+  accX = Wire.read() << 8 | Wire.read();
+  accY = Wire.read() << 8 | Wire.read();
+  accZ = Wire.read() << 8 | Wire.read();
+  tmp = Wire.read() << 8 | Wire.read();
+  gyroX = Wire.read() << 8 | Wire.read();
+  gyroY = Wire.read() << 8 | Wire.read();
+  gyroZ = Wire.read() << 8 | Wire.read();
 
   //apply scale factor for gyro reading
   rotX = gyroX / GYRO_SENSITIVITY_SCALE_FACTOR;
   rotY = gyroY / GYRO_SENSITIVITY_SCALE_FACTOR;
 
-//  Serial.println("read mpu completed ");
+  //  Serial.println("read mpu completed ");
 
 }//end of readGyroX Fcn
 
 /*
- * This Fcn will calculate offset and set initial value of gyro 
- * complementary values
- */
+   This Fcn will calculate offset and set initial value of gyro
+   complementary values
+*/
 
-void calculateOffsets(){
+void calculateOffsets() {
   float gyroTotalValX = 0, gyroTotalValY = 0;
   float accrTotalValX = 0, accrTotalValY = 0;
-  for (int i=0 ; i < noOfSamplesForOffset ; i++){
+  for (int i = 0 ; i < noOfSamplesForOffset ; i++) {
     readMPU();
     gyroTotalValX = gyroTotalValX + rotX;
     gyroTotalValY = gyroTotalValY + rotY;
     //angles from accr
-    angleX = atan(accX/sqrt(pow(accY,2) + pow(accZ,2))) * radToDegreeConvert;
-    angleY = atan(accY/sqrt(pow(accX,2) + pow(accZ,2))) * radToDegreeConvert;
+    angleX = atan(accX / sqrt(pow(accY, 2) + pow(accZ, 2))) * radToDegreeConvert;
+    angleY = atan(accY / sqrt(pow(accX, 2) + pow(accZ, 2))) * radToDegreeConvert;
     accrTotalValX = accrTotalValX + angleX;
     accrTotalValY = accrTotalValY + angleY;
     Serial.println("..........");
@@ -500,8 +502,8 @@ void calculateOffsets(){
 
   //read again to get current values
   readMPU();
-  angleX = atan(accX/sqrt(pow(accY,2) + pow(accZ,2))) * radToDegreeConvert;
-  angleY = atan(accY/sqrt(pow(accX,2) + pow(accZ,2))) * radToDegreeConvert;
+  angleX = atan(accX / sqrt(pow(accY, 2) + pow(accZ, 2))) * radToDegreeConvert;
+  angleY = atan(accY / sqrt(pow(accX, 2) + pow(accZ, 2))) * radToDegreeConvert;
 
   //apply offsets to accr values
   angleX = angleX - accrOffsetValX;
@@ -512,38 +514,35 @@ void calculateOffsets(){
   rotY = angleY;
   compAngleX = angleX;
   compAngleY = angleY;
-  
+
 }//end of calculateGyroOffsets Fcn
 
 /*
- * This Fcn will calculate the angles using complementary filter
- */
+   This Fcn will calculate the angles using complementary filter
+*/
 
-void calculateAngles(){
+void calculateAngles() {
   //angles from accr
-  angleX = atan(accX/sqrt(pow(accY,2) + pow(accZ,2)))*radToDegreeConvert;
-  angleY = atan(accY/sqrt(pow(accX,2) + pow(accZ,2)))*radToDegreeConvert;
+  angleX = atan(accX / sqrt(pow(accY, 2) + pow(accZ, 2))) * radToDegreeConvert;
+  angleY = atan(accY / sqrt(pow(accX, 2) + pow(accZ, 2))) * radToDegreeConvert;
 
   //apply offsets to accr values
   angleX = angleX - accrOffsetValX;
   angleY = angleY - accrOffsetValY;
-  
+
   currentTime = millis();
-  double dt = (currentTime - prevTime)/1000;
+  double dt = (currentTime - prevTime) / 1000;
   prevTime = currentTime;
   //The Mighty Complementary filter
-   compAngleX = 0.99 * (compAngleX + (rotX - gyroOffsetValX) * dt) + 0.01 * angleX; 
-   compAngleY = 0.99 * (compAngleY + (rotY - gyroOffsetValY) * dt) + 0.01 * angleY;
-
-   
+  compAngleX = 0.99 * (compAngleX + (rotX - gyroOffsetValX) * dt) + 0.01 * angleX;
+  compAngleY = 0.99 * (compAngleY + (rotY - gyroOffsetValY) * dt) + 0.01 * angleY;
 }//end of calculateAngles Fcn
 
 
-
 /*
- * In this fuction we configure mpu6050 and calculate offsets i.e calibration
- */
-void initMPU6050(){
+   In this fuction we configure mpu6050 and calculate offsets i.e calibration
+*/
+void initMPU6050() {
   configureMPU();
   calculateOffsets();
 }//end of initMPU6050 Fcn
@@ -558,25 +557,25 @@ void setup() {
 
 void loop() {
   updateAnglesFromMPU();
-  
-  if(armMotors == true && motorsArmed == false){
-      initializeMotors();
-      armAllMotors();
-      motorsArmed = true;
+
+  if (armMotors == true && motorsArmed == false) {
+    initializeMotors();
+    armAllMotors();
+    motorsArmed = true;
   }
 
-  if(armMotors == false){
+  if (armMotors == false) {
     disArmMotors();
     detachMotors();
     motorsArmed = false;
   }
-  
-if(armMotors == true){
-  computePID();
-  updateMotors();
-}//end of armMotors 
+
+  if (armMotors == true) {
+    computePID();
+    updateMotors();
+  }//end of armMotors
 #ifdef TUNING
   checkForBTInput();
 #endif
-    sendBTOutput();
+  sendBTOutput();
 }//end of loop Fcn
