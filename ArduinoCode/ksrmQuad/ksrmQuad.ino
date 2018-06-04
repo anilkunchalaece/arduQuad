@@ -45,7 +45,7 @@
 #include<Wire.h> //used for MPU6050
 #include<math.h> //used in accr angle calculation check accrTest for more info
 
-#define TUNING // used for tuning purpose
+//#define TUNING // used for tuning purpose
 
 //tuning variables
 #ifdef TUNING
@@ -56,7 +56,7 @@ boolean storeRecvData = false;
 char recvDataBuffer[MAX_DATA_LENGTH];
 char strtokDelimiter[] = ","; //used to parse the data
 int index = 0;
-float pp, pd, pi, rp, rd, ri, yp, yd, yi; //pid constants for pitch,roll,yaw
+double pp, pd, pi, rp, rd, ri, yp, yd, yi; //pid constants for pitch,roll,yaw [double since library only supports double]
 #endif
 
 //used to send bluetooth debug info
@@ -80,12 +80,12 @@ unsigned long btDataStartMillis = millis();
 
 //PID Constants
 
-#define pitchPVal 0.5
-#define pitchDVal 0.24
+#define pitchPVal 0.55
+#define pitchDVal 0.90
 #define pitchIVal 0.0
 
-#define rollPVal 0.5
-#define rollDVal 0.25
+#define rollPVal 0.0
+#define rollDVal 0.0
 #define rollIVal 0.0
 
 #define yawPVal 0
@@ -127,6 +127,7 @@ int16_t accX, accY, accZ, gyroX, gyroY, gyroZ, tmp; //used to store the data fro
 double rotX, rotY; //for Gyro's
 double angleX, angleY; //for Accer
 double compAngleX, compAngleY; //for complimentary filter
+double prevCompAngleX, prevCompAngleY; //used to remove small variance error
 
 unsigned long prevTime = 0, currentTime; //to calculate dt for gyro integration
 
@@ -156,7 +157,7 @@ double pidYawIn, pidYawOut, pidYawSetPoint = 0;
 int m0Value, m1Value, m2Value, m3Value;
 
 //PID Instances
-PID pitchController(&pidPitchIn, &pidPitchOut, &pidPitchSetPoint, pitchPVal, pitchIVal, pitchDVal, DIRECT); //what is that reverse and forward ?
+PID pitchController(&pidPitchIn, &pidPitchOut, &pidPitchSetPoint, pitchPVal, pitchIVal, pitchDVal, REVERSE); //what is that reverse and forward ?
 PID rollController(&pidRollIn, &pidRollOut, &pidRollSetPoint, rollPVal, rollIVal, rollDVal, DIRECT);
 //PID yawController(&pidYawIn, &pidYawOut, &pidYawSetPoint, yawPVal, yawIVal, yawDVal, DIRECT);
 
@@ -397,8 +398,8 @@ void sendBTOutput() {
   if (millis() - btDataStartMillis > DATA_INTERVAL) {
     btDataStartMillis = millis();
     //    Serial.print(F("y")); Serial.print(pidYawIn);Serial.print(F(">"));
-    Serial.print(F("p")); Serial.print(compAngleX); Serial.print(F(">")); //pidPitchIn
-    Serial.print(F("r")); Serial.print(compAngleY); Serial.print(F(">")); //PidRollIn
+    Serial.print(F("p")); Serial.print(compAngleY); Serial.print(F(">")); //pidPitchIn
+    Serial.print(F("r")); Serial.print(compAngleX); Serial.print(F(">")); //PidRollIn
     Serial.print(F("ps")); Serial.print(pidPitchSetPoint); Serial.print(F(">"));
     Serial.print(F("rs")); Serial.print(pidRollSetPoint); Serial.print(F(">"));
     Serial.print(F("ys")); Serial.print(pidYawSetPoint); Serial.print(F(">"));
@@ -515,6 +516,10 @@ void calculateOffsets() {
   compAngleX = angleX;
   compAngleY = angleY;
 
+  //used to remove small variances
+  prevCompAngleX = angleX;
+  prevCompAngleY = angleY;
+
 }//end of calculateGyroOffsets Fcn
 
 /*
@@ -536,6 +541,23 @@ void calculateAngles() {
   //The Mighty Complementary filter
   compAngleX = 0.99 * (compAngleX + (rotX - gyroOffsetValX) * dt) + 0.01 * angleX;
   compAngleY = 0.99 * (compAngleY + (rotY - gyroOffsetValY) * dt) + 0.01 * angleY;
+
+  //remove small variations
+  //iam getting + or - 0.04 angle difference even when sensor is stable to remove it 
+  //we are doing this
+  if (compAngleX < prevCompAngleX + 0.04 && compAngleX > prevCompAngleX - 0.04) 
+  {
+    compAngleX = prevCompAngleX;
+  }
+
+  if (compAngleY < prevCompAngleY + 0.04 && compAngleY > prevCompAngleY - 0.04)
+  {
+    compAngleY = prevCompAngleY;
+  }
+
+  prevCompAngleX = compAngleX;
+  prevCompAngleY = compAngleY;
+      
 }//end of calculateAngles Fcn
 
 
