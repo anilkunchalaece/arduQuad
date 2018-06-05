@@ -71,7 +71,7 @@ void configureMPU(){
   Wire.write(0b00000000);
   Wire.endTransmission();
 
-  //Gyro Config
+  //Accr Config
   Wire.beginTransmission(MPU6050_ADDR);
   Wire.write(ACCR_CONFIG_REG_ADDR);
   Wire.write(0b00000000);

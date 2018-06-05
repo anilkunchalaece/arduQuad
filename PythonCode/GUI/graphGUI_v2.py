@@ -14,7 +14,7 @@ import numpy as np
 import serial
 import re
 
-arduinoData = serial.Serial('/dev/ttyACM0', 115200) #Creating our serial object named arduinoData
+arduinoData = serial.Serial('/dev/ttyACM0', 38400) #Creating our serial object named arduinoData
 
 pitchVal = []
 rollVal = []

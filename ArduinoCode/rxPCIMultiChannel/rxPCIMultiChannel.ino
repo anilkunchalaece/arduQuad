@@ -31,7 +31,7 @@ volatile unsigned long pwmStart[4];
 unsigned long pwmEnd[4];
 
 //pinDeclaration for Rx
-const byte rxCh[] = {8, 9, 10, 11,12};
+const byte rxCh[] = {8, 9, 10, 11};
 const byte noOfChannels = sizeof(rxCh);
 
 //portStatus

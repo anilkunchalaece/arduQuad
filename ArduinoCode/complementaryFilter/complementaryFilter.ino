@@ -71,6 +71,12 @@ void configureMPU(){
   Wire.write(ACCR_CONFIG_REG_ADDR);
   Wire.write(0b00000000);
   Wire.endTransmission();
+
+  //Accr Config
+  Wire.beginTransmission(MPU6050_ADDR);
+  Wire.write(ACCR_CONFIG_REG_ADDR);
+  Wire.write(0b00000000);
+  Wire.endTransmission();
 }//end of setUpMPU Fcn
 
 void readMPU(){
@@ -114,14 +120,24 @@ void calculateOffsets(){
     angleY = atan(accY/sqrt(pow(accX,2) + pow(accZ,2))) * radToDegreeConvert;
     accrTotalValX = accrTotalValX + angleX;
     accrTotalValY = accrTotalValY + angleY;
+    Serial.println("..........");
   }//end of for loop
-
   gyroOffsetValX = gyroTotalValX / noOfSamplesForOffset;
   gyroOffsetValY = gyroTotalValY / noOfSamplesForOffset;
 
   accrOffsetValX = accrTotalValX / noOfSamplesForOffset;
   accrOffsetValY = accrTotalValY / noOfSamplesForOffset;
 
+  Serial.print("Gyro Offset X Y");
+  Serial.print(gyroOffsetValX);
+  Serial.print(" ");
+  Serial.println(gyroOffsetValY);
+
+  Serial.print("Accr Offset X Y");
+  Serial.print(accrOffsetValX);
+  Serial.print(" ");
+  Serial.println(accrOffsetValY);
+  
   //read again to get current values
   readMPU();
   angleX = atan(accX/sqrt(pow(accY,2) + pow(accZ,2))) * radToDegreeConvert;

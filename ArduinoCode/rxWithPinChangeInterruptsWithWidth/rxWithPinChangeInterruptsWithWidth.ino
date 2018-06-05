@@ -39,6 +39,7 @@ sei(); //enable all interrupts
 pinMode(rxPin,INPUT);
 digitalWrite(rxPin,HIGH);//enable pull up in pin 9
 Serial.begin(9600);
+Serial.println("Hi there");
 }
 
 void loop() {

@@ -1,36 +1,26 @@
 /*
  * Author : Kunchala Anil
  * Email : anilkunchalaece@gmail.com
- * Date : 02 June 2018
+ * Date : 02 Jun 2018
  * 
- * Storing data in eeprom and retriving it
+ * External interrupts are used to read ch5 and ch6 of tx
  * 
- * PID data will be stored in EEPROM
+ * Arduino Pin      Tx Channel
+ *    2 (INT0)       ch5-VRA
+ *    3 (INT1)       ch6-VRB
  * 
- * version is used to check the is it firsttime to write default values
- * if version is 0 then write the default values
+ * firstItwill check is default values stored in eeprom - if not store them
+ * then based on received tx values are changed accordingly
+ * 
  */
 
 #include<EEPROM.h>
 
-//PID default values
-//#define ppDefaultValue 0.5*100 //multiplication allow us to store float as byte
-//#define piDefaultValue 0.0*100
-//#define pdDefaultValue 0.25*100
-//
-//#define rpDefaultValue 0.5*100
-//#define riDefaultValue 0.0*100
-//#define rdDefaultValue 0.25*100
-//
-//#define ypDefaultValue 0
-//#define yiDefaultValue 0
-//#define ydDefaultValue 0
-
 const byte pidDefaultValues[] =  {
-                              0.5*100,0,0.25*100, //Pitch p,i,d
-                              0.5*100,0,0.25, //Roll p,i,d
-                              0,0,0 //Yaw p,i,d
-    };
+                                    0.5*100,0,0.25*100, //Pitch p,i,d
+                                    0.5*100,0,0.25, //Roll p,i,d
+                                    0,0,0 //Yaw p,i,d
+                                };
 
 //EEPRPOM Locations for PID Values
 #define verAddress 9 //to write default values
@@ -55,22 +45,57 @@ const byte EEPROM_ADDRESS[] = {ppAddress,piAddress,pdAddress,rpAddress,riAddress
                              ypAddress,yiAddress,ydAddress};
 
 byte pidValues[] = {ppValue,piValue,pdValue,rpValue,riValue,rdValue,ypValue,yiValue,ydValue};
-//int pp,pi,pd,rp,ri,rd,yp,yi,yd; //variabeles to store the pid values i.e readings from eeprom
 
-int address = 0;
- 
+
+
+//Variables to read ch5 and ch6
+#define VRA_CHANNEL 2
+#define VRB_CHANNEL 3
+
+volatile int pwmValue[2];
+volatile int prevTime[2];
+
 void setup() {
-  Serial.begin(9600);
-  Serial.println("EEPROM check");
-  writeDefaultValues();
-  
-}//end of setup
+  Serial.begin(115200);
+  //interrupts for pin2 and pin3 for ch5 and ch6
+  attachInterrupt(digitalPinToInterrupt(VRA_CHANNEL), risingVRA, RISING);
+  attachInterrupt(digitalPinToInterrupt(VRB_CHANNEL),risingVRB,RISING);
+  writeDefaultValues();//write default if haven't already
+}//end of setup Fcn
 
 void loop() {
-  //do nothing
-}//end of loop
+  checkForTuningInput();   
+}//end of loop Fcn
+
+//ProceessTuningInput
+void checkForTuningInput(){
+  
+}
 
 
+//Function used for interrupts
+void risingVRA() {
+  attachInterrupt(digitalPinToInterrupt(VRA_CHANNEL), fallingVRA, FALLING);
+  prevTime[0] = micros();
+}
+ 
+void fallingVRA() {
+  attachInterrupt(digitalPinToInterrupt(VRA_CHANNEL), risingVRA, RISING);
+  
+  pwmValue[0] = micros()-prevTime[0];
+}
+
+void risingVRB(){
+  attachInterrupt(digitalPinToInterrupt(VRB_CHANNEL),fallingVRB,FALLING);
+  prevTime[1] = micros();
+}
+
+void fallingVRB(){
+  attachInterrupt(digitalPinToInterrupt(VRB_CHANNEL),risingVRB,RISING);
+  pwmValue[1] = micros() - prevTime[1];
+}
+
+//Functions used for EEPROM read & write
 /*
  * This function will check for ver value 
  * if stored default val not equal to verDefaultValue then it will write default values to it

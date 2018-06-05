@@ -470,7 +470,6 @@ void setPointUpdate() {
   Serial.print("pitch set point "); Serial.println(pidPitchSetPoint); 
   Serial.print("roll set point "); Serial.println(pidRollSetPoint);
 #endif
-
 }//end of setPointUpdateFcn
 
 

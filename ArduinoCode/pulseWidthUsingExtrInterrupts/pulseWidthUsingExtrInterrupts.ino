@@ -1,3 +1,10 @@
+/*
+ * Author : Kunchala Anil
+ * Email : anilkunchalaece@gmail.com
+ * Date : 02 June 2018
+ * 
+ * using external interrupts to measure the pulse width
+ */
 volatile int pwmValue[2];
 volatile int prevTime[2];
 volatile boolean readVRA;
