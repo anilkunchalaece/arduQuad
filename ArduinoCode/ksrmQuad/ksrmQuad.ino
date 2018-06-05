@@ -80,8 +80,8 @@ unsigned long btDataStartMillis = millis();
 
 //PID Constants
 
-#define pitchPVal 0.55
-#define pitchDVal 0.90
+#define pitchPVal 0.5
+#define pitchDVal 2.5
 #define pitchIVal 0.0
 
 #define rollPVal 0.0
@@ -127,7 +127,7 @@ int16_t accX, accY, accZ, gyroX, gyroY, gyroZ, tmp; //used to store the data fro
 double rotX, rotY; //for Gyro's
 double angleX, angleY; //for Accer
 double compAngleX, compAngleY; //for complimentary filter
-double prevCompAngleX, prevCompAngleY; //used to remove small variance error
+double prevCompAngleX, prevCompAngleY; //used to remove small(+- 0.04) variance error
 
 unsigned long prevTime = 0, currentTime; //to calculate dt for gyro integration
 
@@ -157,7 +157,7 @@ double pidYawIn, pidYawOut, pidYawSetPoint = 0;
 int m0Value, m1Value, m2Value, m3Value;
 
 //PID Instances
-PID pitchController(&pidPitchIn, &pidPitchOut, &pidPitchSetPoint, pitchPVal, pitchIVal, pitchDVal, REVERSE); //what is that reverse and forward ?
+PID pitchController(&pidPitchIn, &pidPitchOut, &pidPitchSetPoint, pitchPVal, pitchIVal, pitchDVal, DIRECT); //what is that reverse and forward ?
 PID rollController(&pidRollIn, &pidRollOut, &pidRollSetPoint, rollPVal, rollIVal, rollDVal, DIRECT);
 //PID yawController(&pidYawIn, &pidYawOut, &pidYawSetPoint, yawPVal, yawIVal, yawDVal, DIRECT);
 
@@ -165,15 +165,14 @@ PID rollController(&pidRollIn, &pidRollOut, &pidRollSetPoint, rollPVal, rollIVal
 //used to store the pwm duration
 volatile unsigned long pwmDuration[4];
 volatile unsigned long pwmStart[4];
-unsigned long pwmEnd[4];
 
 //pinDeclaration for Rx
 const byte rxCh[] = {8, 9, 10, 11};
 const byte noOfChannels = sizeof(rxCh);
 
 //portStatus
-volatile int prevPortState[] = {0, 0, 0, 0};
-volatile int presentPortState[4];
+volatile byte prevPortState[] = {0, 0, 0, 0};
+volatile byte presentPortState[4];
 
 //Interrupt Service Routine will fire when for PinChange in PortB
 ISR(PCINT0_vect) {
@@ -223,6 +222,12 @@ void updateMotors() {
   if (m1Value < motorArmValue) m1Value = motorArmValue + 50;
   if (m2Value < motorArmValue) m2Value = motorArmValue + 50;
   if (m3Value < motorArmValue) m3Value = motorArmValue + 50;
+
+  //dont send values more than motorMaxValue - ESC may get into trouble
+  if (m0Value > motorMaxValue) m0Value = motorMaxValue;
+  if (m1Value > motorMaxValue) m1Value = motorMaxValue;
+  if (m2Value > motorMaxValue) m2Value = motorMaxValue;
+  if (m3Value > motorMaxValue) m3Value = motorMaxValue;
 
   //send the values to esc
   motor0.writeMicroseconds(m0Value);
@@ -277,14 +282,14 @@ void updateAnglesFromMPU() {
 }//end of updateAnglesFromMPU Fcn
 
 void initPID() {
-  rollController.SetOutputLimits(rollMin, rollMax);
-  pitchController.SetOutputLimits(pitchMin, pitchMax);
+  rollController.SetOutputLimits(-50,50);
+  pitchController.SetOutputLimits(-50,50);
   //  yawController.SetOutputLimits(yawMin, yawMax);
   rollController.SetMode(AUTOMATIC);
   pitchController.SetMode(AUTOMATIC);
   //  yawController.SetMode(AUTOMATIC);
-  //  rollController.SetSampleTime(10);
-  //  pitchController.SetSampleTime(10);
+    rollController.SetSampleTime(10);
+    pitchController.SetSampleTime(10);
   //  yawController.SetSampleTime(10);
   Serial.println(F("pid initialisation completed"));
 }//end of initPID Fcn
@@ -555,6 +560,7 @@ void calculateAngles() {
     compAngleY = prevCompAngleY;
   }
 
+  //store the angle values
   prevCompAngleX = compAngleX;
   prevCompAngleY = compAngleY;
       
