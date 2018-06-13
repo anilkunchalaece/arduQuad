@@ -80,12 +80,12 @@ unsigned long btDataStartMillis = millis();
 //PID Constants
 
 
-#define pitchPVal 0
-#define pitchDVal 150
+#define pitchPVal 2.7
+#define pitchDVal 120
 #define pitchIVal 0.0
 
-#define rollPVal 0
-#define rollDVal 150
+#define rollPVal 2.7
+#define rollDVal 120
 #define rollIVal 0
 
 #define yawPVal 0
@@ -131,7 +131,8 @@ double angleX, angleY; //for Accer
 double compAngleX, compAngleY; //for complimentary filter
 double prevCompAngleX, prevCompAngleY; //used to remove small(+- 0.04) variance error
 
-unsigned long prevTime = 0, currentTime; //to calculate dt for gyro integration
+unsigned long prevTime = 0, currentTime=0,loopTimer=0; //to calculate dt for gyro integration
+unsigned long now, difference;
 
 //offset variables
 float gyroOffsetValX = 0, gyroOffsetValY = 0;
@@ -218,11 +219,11 @@ void updateMotors() {
   m2Value = throttle + pidPitchOut; //- pidYawOut;
   m3Value = throttle + pidRollOut; //+ pidYawOut;
 
-  //keep the motors running
-  if (m0Value < motorArmValue) m0Value = motorArmValue + 50;
-  if (m1Value < motorArmValue) m1Value = motorArmValue + 50;
-  if (m2Value < motorArmValue) m2Value = motorArmValue + 50;
-  if (m3Value < motorArmValue) m3Value = motorArmValue + 50;
+//  //keep the motors running
+//  if (m0Value < motorArmValue) m0Value = motorArmValue + 50;
+//  if (m1Value < motorArmValue) m1Value = motorArmValue + 50;
+//  if (m2Value < motorArmValue) m2Value = motorArmValue + 50;
+//  if (m3Value < motorArmValue) m3Value = motorArmValue + 50;
 
   //dont send values more than motorMaxValue - ESC may get into trouble
   if (m0Value > motorMaxValue) m0Value = motorMaxValue;
@@ -230,23 +231,42 @@ void updateMotors() {
   if (m2Value > motorMaxValue) m2Value = motorMaxValue;
   if (m3Value > motorMaxValue) m3Value = motorMaxValue;
 
+//  while(micros() - loopTimer < 4000) {
+//    //wait until 4000 microseconds passed
+//    //i.e send ESC pulse every 4000 micro seconds
+//  }
+//  //update the loopTimer
+//  loopTimer = micros();
+//  
+//  setAllMotorOutputsToHigh();
+//    //wait until all the outputs are low
+//  while(digitalRead(m0) || digitalRead(m1) || digitalRead(m2) || digitalRead(m3)){
+//     unsigned long currentTime = micros();
+//    if(m0Value <= currentTime )  digitalWrite(m0,LOW);//if time is complete lower the pulse
+//    if(m1Value <= currentTime ) digitalWrite(m1,LOW);
+//    if(m2Value <= currentTime ) digitalWrite(m2,LOW);
+//    if(m3Value <= currentTime ) digitalWrite(m3,LOW);
+//  }//end of while
 
-  while(micros() - loopTimer < 4000) {
-    //wait until 4000 microseconds passed
-    //i.e send ESC pulse every 4000 micro seconds
-  }
-  //update the loopTimer
-  loopTimer = micros();
-  
-  setAllMotorOutputsToHigh();
-    //wait until all the outputs are low
-  while(digitalRead(m0) || !digitalRead(m1) || !digitalRead(m2) || !digitalRead(m3)){
-    unsigned long currentTime = millis();
-    if(m0Val <= currentTime )  digitalWrite(m0,LOW);//if time is complete lower the pulse
-    if(m1Val <= currentTime ) digitalWrite(m1,LOW);
-    if(m2Val <= currentTime ) digitalWrite(m2,LOW);
-    if(m3Val <= currentTime ) digitalWrite(m3,LOW);
-  }//end of while
+    // Refresh rate is 250Hz: send ESC pulses every 4000µs
+    while ((now = micros()) - loopTimer < 4000);
+
+    // Update loop timer
+    loopTimer = now;
+
+    // Set pins #4 #5 #6 #7 HIGH
+    PORTD |= B11110000;
+
+    // Wait until all pins #4 #5 #6 #7 are LOW
+    while (PORTD >= 16) {
+        now        = micros();
+        difference = now - loopTimer;
+
+        if (difference >= m0Value) PORTD &= B11101111; // Set pin #4 LOW
+        if (difference >= m1Value) PORTD &= B11011111; // Set pin #5 LOW
+        if (difference >= m2Value) PORTD &= B10111111; // Set pin #6 LOW
+        if (difference >= m3Value) PORTD &= B01111111; // Set pin #7 LOW
+}
 
 }//end of updateMotors Fcn
 
@@ -270,9 +290,9 @@ void setAllMotorOutputsToHigh(){
 void armAllMotors() {
   setAllMotorOutputsToHigh();
   //wait until all the outputs are low
-  while(digitalRead(m0) || !digitalRead(m1) || !digitalRead(m2) || !digitalRead(m3)){
+  while(digitalRead(m0) || digitalRead(m1) || digitalRead(m2) || digitalRead(m3)){
     unsigned long currentTime = micros();
-    if(motorArmValue <= currentTimer ){
+    if(motorArmValue <= currentTime ){
       digitalWrite(m0,LOW);
       digitalWrite(m1,LOW);
       digitalWrite(m2,LOW);
@@ -288,17 +308,18 @@ void armAllMotors() {
 void disArmMotors() {
   setAllMotorOutputsToHigh();
   //wait until all the outputs are low
-  while(digitalRead(m0) || !digitalRead(m1) || !digitalRead(m2) || !digitalRead(m3)){
+  while(digitalRead(m0) || digitalRead(m1) || digitalRead(m2) || digitalRead(m3)){
+    //Serial.println("im struck");
     unsigned long currentTime = micros();
-    if((motorArmValue - 100) <= currentTimer ){
+    if((motorArmValue - 100) <= currentTime ){
       digitalWrite(m0,LOW);
       digitalWrite(m1,LOW);
       digitalWrite(m2,LOW);
       digitalWrite(m3,LOW);
     }//end of IF
   }//end of while
- 
-  Serial.println(F("motors are disarmed "));
+ Serial.println("motors are disarmed");
+//  Serial.println(F("motors are disarmed "));
 }//end of disArmMotors Fcn
 
 //get register values from mpu6050 and calculate angles based on complementary filter
@@ -329,7 +350,7 @@ void computePID() {
   
   //update setpoint according to throttle
   setPointUpdate();
-  
+    
   //calculate errors
   pitchError = compAngleY - pidPitchSetPoint;
   rollError = compAngleX - pidRollSetPoint;
@@ -624,6 +645,7 @@ void setup() {
   initReceiver();
   Serial.begin(38400); //HC-05 is using hardware serial , 38400 is HC-05 Default Baud Rate
   initMPU6050();
+  initializeMotors();
   prevTime = millis(); //used to calculate dt for gyro integration
   loopTimer = micros() ; // used to calculate the loop timer [do we need it?]
 //  pinMode(12,OUTPUT); //to check execution time
@@ -631,17 +653,15 @@ void setup() {
 }//end of setup Fcn
 
 void loop() {
-//  digitalWrite(12,!digitalRead(12)); to check execution time
+//   digitalWrite(12,!digitalRead(12));// to check execution time
   updateAnglesFromMPU(); 
-  if (armMotors == true && motorsArmed == false) {
-    initializeMotors();
+   if (armMotors == true && motorsArmed == false) {
     armAllMotors();
     motorsArmed = true;
   }
 
   if (armMotors == false) {
     disArmMotors();
-    detachMotors();
     motorsArmed = false;
   }
 

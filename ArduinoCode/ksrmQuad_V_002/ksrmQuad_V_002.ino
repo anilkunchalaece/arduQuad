@@ -79,19 +79,20 @@ unsigned long btDataStartMillis = millis();
 
 //PID Constants
 
-#define pitchPVal 0.41
-#define pitchDVal 135.1
-#define pitchIVal 0.15
 
-#define rollPVal 0.41
-#define rollDVal 140.1
-#define rollIVal 0.15
+#define pitchPVal 0
+#define pitchDVal 150
+#define pitchIVal 0.0
+
+#define rollPVal 0
+#define rollDVal 150
+#define rollIVal 0
 
 #define yawPVal 0
 #define yawDVal 0
 #define yawIVal 0
 
-#define pidOutputMax 90 //used to remove integral windup - dont know how to choose this value
+#define pidOutputMax 400 //used to remove integral windup - dont know how to choose this value
 
 //Flight Parameters
 #define pitchMin -30
@@ -364,7 +365,7 @@ void processReceivedData() {
   yd = atof(strtokIndex);
   strtokIndex = strtok(NULL, strtokDelimiter); // get yi
   yi = atof(strtokIndex);
-
+//here there is no auto tune method - we can use these to send individual pid calculations
   Serial.print(F("@pp")); Serial.print(pp); Serial.print(F(">"));
   Serial.print(F("@pi")); Serial.print(pi); Serial.print(F(">"));
   Serial.print(F("@pd")); Serial.print(pd); Serial.print(F(">"));
@@ -569,15 +570,16 @@ void calculateAngles() {
   //remove small variations
   //iam getting + or - 0.04 angle difference even when sensor is stable to remove it 
   //we are doing this
-  if (compAngleX < prevCompAngleX + 0.04 && compAngleX > prevCompAngleX - 0.04) 
-  {
-    compAngleX = prevCompAngleX;
-  }
-
-  if (compAngleY < prevCompAngleY + 0.04 && compAngleY > prevCompAngleY - 0.04)
-  {
-    compAngleY = prevCompAngleY;
-  }
+  //REMOVING VARIANCE FILTER TO CHECK YMFC TUNING
+//  if (compAngleX < prevCompAngleX + 0.02 && compAngleX > prevCompAngleX - 0.02) 
+//  {
+//    compAngleX = prevCompAngleX;
+//  }
+//
+//  if (compAngleY < prevCompAngleY + 0.02 && compAngleY > prevCompAngleY - 0.02)
+//  {
+//    compAngleY = prevCompAngleY;
+//  }
 
   //store the angle values
   prevCompAngleX = compAngleX;
@@ -599,11 +601,13 @@ void setup() {
   Serial.begin(38400); //HC-05 is using hardware serial , 38400 is HC-05 Default Baud Rate
   initMPU6050();
   prevTime = millis(); //used to calculate dt for gyro integration
+//  pinMode(12,OUTPUT); //to check execution time
+//  digitalWrite(12,LOW);
 }//end of setup Fcn
 
 void loop() {
-  updateAnglesFromMPU();
-
+//  digitalWrite(12,!digitalRead(12)); to check execution time
+  updateAnglesFromMPU(); 
   if (armMotors == true && motorsArmed == false) {
     initializeMotors();
     armAllMotors();
@@ -624,4 +628,5 @@ void loop() {
   checkForBTInput();
 #endif
   sendBTOutput();
+
 }//end of loop Fcn
