@@ -13,8 +13,22 @@ import pyqtgraph as pg
 import numpy as np
 import serial
 import re
+import datetime
 
-arduinoData = serial.Serial('/dev/ttyACM0', 38400) #Creating our serial object named arduinoData
+arduinoData = serial.Serial('/dev/ttyACM0', 115200) #Creating our serial object named arduinoData
+
+pidPPValue = input("Enter PitchP Val \t")
+pidPDValue = input("Enter PitchD Val \t")
+pidPIValue = input("Enter pitchI Val \t")
+
+pidRPValue = input("Enter RollP Val \t")
+pidRDValue = input("Enter RollD Val \t")
+pidRIValue = input("Enter RollI Val \t")
+
+fileName = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+fHandler = open('debug/'+fileName+'.csv','w')
+fHandler.write('p,r,po,ro,ps,rs,m0,m1,m2,m3 \t')
+fHandler.write('pp'+str(pidPPValue)+'pd'+str(pidPDValue)+'pi'+str(pidPIValue)+'rp'+str(pidRPValue)+'rd'+str(pidRDValue)+'ri'+str(pidRIValue)+'\n')
 
 pitchVal = []
 rollVal = []
@@ -75,12 +89,12 @@ yawPlot.addItem(yawPlotPlt2)
 yawPlot.setYRange(-32,32)
 
 motorPlot.addLegend()
-motorPlotPlt = motorPlot.plot(x3,m0Val,clear=True,pen=(1,4),name="Front")
-motorPlotPlt2 = pg.PlotCurveItem(x3,m1Val,clear=True,pen=(2,4),name="Right")
+motorPlotPlt = motorPlot.plot(x3,m0Val,clear=True,pen=(1,4),name="Right Front")
+motorPlotPlt2 = pg.PlotCurveItem(x3,m1Val,clear=True,pen=(2,4),name="Right Rear")
 motorPlot.addItem(motorPlotPlt2)
-motorPlotPlt3 = pg.PlotCurveItem(x3,m2Val,clear=True,pen=(3,4),name="Rear")
+motorPlotPlt3 = pg.PlotCurveItem(x3,m2Val,clear=True,pen=(3,4),name="Left Rear")
 motorPlot.addItem(motorPlotPlt3)
-motorPlotPlt4 = pg.PlotCurveItem(x3,m3Val,clear=True,pen=(4,4),name="Left")
+motorPlotPlt4 = pg.PlotCurveItem(x3,m3Val,clear=True,pen=(4,4),name="Left Front")
 motorPlot.addItem(motorPlotPlt4)
 
 #pitchPlotPlt = pitchPlot.plot(x1,pitchVal,clear=True,pen=(1,2),name="Pitch")
@@ -119,10 +133,10 @@ rollSetPointInstLable = QtGui.QLabel("Roll SetPoint")
 pitchSetPointInstLable = QtGui.QLabel("Pitch SetPoint")
 #yawSetPointInstLable = QtGui.QLabel("Yaw SetPoint")
 
-frontMotorInstLable = QtGui.QLabel("Front")
-rightMotorInstLable = QtGui.QLabel("Right")
-rearMotorInstLable = QtGui.QLabel("Rear")
-leftMotorInstLable = QtGui.QLabel("Left")
+frontMotorInstLable = QtGui.QLabel("Right Front")
+rightMotorInstLable = QtGui.QLabel("Right Rear")
+rearMotorInstLable = QtGui.QLabel("Left Rear")
+leftMotorInstLable = QtGui.QLabel("Left Front")
 
 ch1InstLable = QtGui.QLabel("CH1-Roll")
 ch2InstLable = QtGui.QLabel("CH2-Pitch")
@@ -335,10 +349,10 @@ def checkForReadings(data):
             yawSetpoint.pop(0)
 
     if len(m0) > 0  and len(m1) > 0 and len(m2) > 0 and len(m3) > 0:
-        frontMotorInstLable.setText('Front --> '+m0[0])
-        rightMotorInstLable.setText('Right --> '+m1[0])
-        rearMotorInstLable.setText('Rear  --> '+m2[0])
-        leftMotorInstLable.setText('Left  --> '+m3[0])
+        frontMotorInstLable.setText('Right Front --> '+m0[0])
+        rightMotorInstLable.setText('Right Rear --> '+m1[0])
+        rearMotorInstLable.setText('Left Rear  --> '+m2[0])
+        leftMotorInstLable.setText('Left Front  --> '+m3[0])
         m0Val.append(float(m0[0]))
         m1Val.append(float(m1[0]))
         m2Val.append(float(m2[0]))
@@ -392,7 +406,9 @@ def checkForReadings(data):
         print "yd-" + str(ydVal[0]) + " ", # comma is used to not to print new line
         yd.setValue(float(ydVal[0]))                 
     # print [y,p,r,ps,rs,po,ro,m0,m1,m2,m3]
-
+    # fHandler.write('p,r,po,ro,ps,rs,m0,m1,m2,m3 \n')
+    if len(p) > 0 and len(r) > 0 and len(ps) > 0 and len(rs) > 0 and len(po) > 0 and len(ro) > 0 and len(m0) > 0 and len(m1) > 0 and len(m2) > 0 and len(m3) > 0 :
+        fHandler.write(str(p[0])+','+str(r[0])+','+str(ps[0])+','+str(rs[0])+','+str(po[0])+','+str(ro[0])+','+str(m0[0])+','+str(m1[0])+','+str(m2[0])+','+str(m3[0])+'\n')
 
 def checkData():
     # print "check data"
