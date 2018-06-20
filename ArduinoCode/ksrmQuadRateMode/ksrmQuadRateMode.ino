@@ -1,0 +1,435 @@
+/*
+ * Author :Kunchala Anil
+ * Email : anilkunchalaece@gmail.com
+ * Date : 20 June 2018
+ * 
+ * Quadcopter flightcontroller in the rate mode
+ * The input pulses from RC receiver are converted to the +/- rate of rotation.
+ * The pilot input acts as the SetPoint to roll,pitch and yaw rate PID's. Measured input to PID comes from 
+ * gyroscope
+ * 
+ * Motor directions for Quad X configuration
+ * 
+ *      7(cw)  4(ccw)
+ *         \    /
+ *          \  /
+ *           \/   
+ *           /\
+ *          /  \
+ *         /    \
+ *      6(ccw) 5(cw)
+ *      
+ *                          Arduino Pin
+ *     m0 rightFront  - ccw      4
+ *     m1 rightRear   - cw       5
+ *     m2 leftRear    - ccw      6
+ *     m3 leftFront   - cw       7
+ *     
+ *  MPU6050 Connections
+ *     SCL   - A5
+ *     SDA   - A4
+ *   
+ *  Rx connections 
+ *  Enable PCMSK0 Register - PCMSK0 - portB (D8-D13) (PCINT0-PCINT6) 
+ *          ArduinoPin     PCINTx
+ *      ch1  - 8        PCINT0 - Roll        
+ *      ch2  - 9        PCINT1 - Pitch
+ *      ch3  - 10       PCINT2 - Throttle
+ *      ch4  - 11       PCINT3 - YAW
+ * 
+ *  Arm and Disarm mechanism
+ *    To Arm    - Throttle Min && Yaw Max
+ *    To DisArm - Throttle Min && Roll Max 
+ *     
+ */
+
+// Dont use servo - it is limited to 50Hz and conflict with Software serial
+// If you are planning for more serial devices go for arduino Mega
+// I use blutooth to get flight parameters - it will be used with hardware serial
+
+#include<PID_v1.h>
+#include<Wire.h>
+#include<math.h>
+
+ //used to send debug info via bluetooth
+ #define DEBUG
+
+ #define DATA_INTERVAL 200 //send debug info every 200 milli seconds
+ unsigned long btDataStartMillis;
+
+//motor connections
+#define m0 4
+#define m1 5
+#define m2 6
+#define m3 7
+
+//receiver connections
+#define ch0 8
+#define ch1 9
+#define ch2 10
+#define ch3 11
+
+#define throttleMinValue 1200
+#define throttleMaxValue 1800
+
+#define motorMaxValue 1800
+
+#define ch0Max 1800
+#define ch0Min 1200
+#define ch1Max 1800
+#define ch1Min 1200
+#define ch2Max 1800
+#define ch2Min 1200
+#define ch3Max 1800
+#define ch3Min 1200 
+
+#define chMid 1500
+
+#define pitchRateMax 180 //degress per sec
+#define pitchRateMin -180
+#define rollRateMax 180
+#define rollRateMin -180
+#define yawRateMax 180
+#define yawRateMin -180 
+
+//variables used for MPU6050 Angle calculation
+const float GYRO_SENSITIVITY_SCALE_FACTOR = 65.5; //for 500 degrees/sec full scale 
+
+//MPU6050 I2C address
+const byte MPU6050_ADDR = 0b1101000;
+//MPU6050 Register Addresses
+const byte PWR_REG_ADDR = 0x6B;
+const byte GYRO_CONFIG_REG_ADDR = 0x1B;
+const byte GYRO_CONFIG_REG_VALUE = 0x08;//for 500 degrees / sec
+const byte ACCR_CONFIG_REG_ADDR = 0x1C;
+const byte ACCR_CONFIG_REG_VALUE = 0x10; //for +/- 8g
+const byte ACCR_READ_START_ADDR = 0x3B;
+
+//variables used for angular rate and angle calculations
+const float radToDegreeConvert = 180.0 / PI;
+
+int16_t accX,accY,accZ,gyroX,gyroY,gyroZ,tmp;//used to store the data from MPU6050 registers
+double rotX,rotY; //used to store the angular rotation from gyro
+double angleX,angleY;//used to store the angle calculated from accr
+double compAngleX,compAngleY;//for complimentary filter
+
+
+unsigned long prevTime = 0, currentTime=0; //used to calculate the dt for gyro integration
+unsigned long loopTimer=0, now=0, difference=0; //used to calculate the loop execution time
+
+//gyro offset variables
+float gyroOffsetValX = 0, gyroOffsetValY = 0;
+float accrOffsetValX = 0, accrOffsetValY = 0; //do we need offset for accr ?
+
+const int noOfSamplesForOffset = 400;
+
+//variables used in pinChange ISR
+volatile boolean armMotors = false; //used to arm and disarm quad
+volatile unsigned long pwmDuration[4]; //used to store pwm duration
+volatile unsigned long pwmStart[4];
+
+//port status
+volatile byte prevPortState[] = {0,0,0,0};
+volatile byte presentPortState[4];
+
+//pinDeclarations for Rx
+const byte rxCh[] = {ch0,ch1,ch2,ch3};
+const byte noOfChannels = sizeof(rxCh);
+
+//PID Constants
+const double pitchRatePGain = 0.10;
+const double pitchRateIGain = 0.00;
+const double pitchRateDGain = 0.02;
+
+const double rollRatePGain = pitchRatePGain;
+const double rollRateIGain = pitchRateIGain;
+const double rollRateDGain = rollRateDGain;
+
+const double yawRatePGain = 0.0;
+const double yawRateIGain = 0.0;
+const double yawRateDGain = 0.0;
+
+// PID variables
+double pidPitchRateIn,pidPitchRateOut,pidPitchRateSetPoint;
+double pidRollRateIn,pidRollRateOut,pidRollRateSetPoint;
+double pidYawRateIn,pidYawRateOut,pidYawRateSetPoint;
+
+//PID Instances
+PID pitchRateController (&pidPitchRateIn,&pidPitchRateOut,&pidPitchRateSetPoint,pitchRatePGain,pitchRateIGain,pitchRateDGain,DIRECT);
+PID rollRateController (&pidRollRateIn,&pidRollRateOut,&pidRollRateSetPoint,rollRatePGain,rollRateIGain,rollRateDGain,DIRECT);
+PID yawRateController (&pidYawRateIn,&pidYawRateOut,&pidYawRateSetPoint,yawRatePGain,yawRateIGain,yawRateDGain,DIRECT);
+
+//variables to store the motor values calculated using pid and throttle
+int m0Value, m1Value,m2Value,m3Value;
+
+//Interrupt Service Routine will fire when for PinChange in PortB
+ISR(PCINT0_vect) {
+  for (int ch = 0; ch < noOfChannels ; ch++) {
+    presentPortState[ch] = digitalRead(rxCh[ch]);
+  }//end of for looptr
+
+  for (int c = 0; c < noOfChannels ; c++) {
+    if (prevPortState[c] == 0 & presentPortState[c] == 1) {
+      //if previous state is 0 and present state is 1 (Raising Edge) then take the time stamp
+      pwmStart[c] = micros();
+      prevPortState[c] = 1; //update the prevPort State
+    } else if (prevPortState[c] == 1 & presentPortState[c] == 0) {
+      //if previous state is 1 and present state is 0 (Falling Edge) then calculate the width based on the change
+      pwmDuration[c] = micros() - pwmStart[c];
+      prevPortState[c] = 0; //update Present PortState
+    }
+  }//end of for loop
+
+  //ARM motors
+  if (pwmDuration[2] < 1250 && pwmDuration[3] > 1700) {
+    //Throttle Min And Yaw Max
+    armMotors = true;
+  }
+
+  //DISARM Motors
+  if (pwmDuration[2] < 1250 && pwmDuration[0] > 1700) {
+    //Throttle Min and Roll Max
+    armMotors = false;
+  }
+}//end of ISR Fcn
+
+
+void initReceiver() {
+  cli(); //Clear all interrupts
+  PCICR |= 1 << PCIE0; //Enable port B Registers i.e D8-D13
+  PCMSK0 |= 1 << PCINT3 | 1 << PCINT2 | 1 << PCINT1 | 1 << PCINT0 ; // Pin11,10,9,8
+  sei(); //enable all interrupts
+
+  for (int i = 0 ; i < noOfChannels ; i++) {
+    pinMode(rxCh[i], INPUT);
+    digitalWrite(rxCh[i], HIGH); //enable pullup
+  }//end of for loop
+}//end of initReceiver Fcn
+
+
+void updateMotors() {
+
+  int throttle = pwmDuration[2];
+  m0Value = throttle + pidPitchRateOut + pidRollRateOut; //- pidYawRateOut;
+  m1Value = throttle - pidPitchRateOut + pidRollRateOut; //+ pidYawRateOut;
+  m2Value = throttle - pidPitchRateOut - pidRollRateOut; //- pidYawRateOut;
+  m3Value = throttle + pidPitchRateOut - pidRollRateOut; //+ pidYawRateOut;
+
+  //dont send values more than motorMaxValue - ESC may get into trouble
+  if (m0Value > motorMaxValue) m0Value = motorMaxValue;
+  if (m1Value > motorMaxValue) m1Value = motorMaxValue;
+  if (m2Value > motorMaxValue) m2Value = motorMaxValue;
+  if (m3Value > motorMaxValue) m3Value = motorMaxValue;
+
+    // Refresh rate is 250Hz: send ESC pulses every 4000µs
+    while ((now = micros()) - loopTimer < 4000);
+
+    // Update loop timer
+    loopTimer = now;
+
+    // Set pins #4 #5 #6 #7 HIGH
+    PORTD |= B11110000;
+
+    // Wait until all pins #4 #5 #6 #7 are LOW
+    while (PORTD >= 16) {
+        now        = micros();
+
+        difference = now - loopTimer;
+
+        if (difference >= m0Value) PORTD &= B11101111; // Set pin #4 LOW
+        if (difference >= m1Value) PORTD &= B11011111; // Set pin #5 LOW
+        if (difference >= m2Value) PORTD &= B10111111; // Set pin #6 LOW
+        if (difference >= m3Value) PORTD &= B01111111; // Set pin #7 LOW
+}//end of while loop
+
+}//end of updateMotors Fcn
+
+
+void initializeMotors() {
+    pinMode(m0,OUTPUT);
+    pinMode(m1,OUTPUT);
+    pinMode(m2,OUTPUT);
+    pinMode(m3,OUTPUT);
+}//end of initializeMotors Fcn
+
+/*
+ * This function will convert Rx inputs into angular rate
+ * which are used as SetPoints for PID
+ */
+ 
+void setPointUpdate() {
+  pidRollRateSetPoint = 0;
+  pidPitchRateSetPoint = 0;
+  if (pwmDuration[0] > chMid - 10  && pwmDuration[0] < chMid + 10) {
+    pidRollRateSetPoint = 0;
+  } else {
+    //map syntax - map(value, fromLow, fromHigh, toLow, toHigh)
+    //ref : https://arduino.stackexchange.com/questions/9219/why-is-the-constrain-function-used-after-the-map-function
+    pidRollRateSetPoint = map(pwmDuration[0], ch0Min, ch0Max, rollRateMin, rollRateMax);
+    pidRollRateSetPoint = constrain(pidRollRateSetPoint, rollRateMin, rollRateMax);
+    
+  }
+  if (pwmDuration[1] > chMid - 10 && pwmDuration[1] < chMid + 10) {
+    pidPitchRateSetPoint = 0;
+  } else {
+    pidPitchRateSetPoint = map(pwmDuration[1], ch1Min, ch1Max, pitchRateMin, pitchRateMax);
+    pidPitchRateSetPoint = constrain(pidPitchRateSetPoint, pitchRateMin, pitchRateMax);
+  }
+}//end of SetPointUpdate Fcn
+
+
+void initPID() {
+  rollRateController.SetOutputLimits(-300,300);
+  pitchRateController.SetOutputLimits(-300,300);
+  yawRateController.SetOutputLimits(-300,300);
+  rollRateController.SetMode(AUTOMATIC);
+  pitchRateController.SetMode(AUTOMATIC);
+  yawRateController.SetMode(AUTOMATIC);
+  rollRateController.SetSampleTime(3); //sample time every 3 milliseconds cause main loop runs every 4 milli sec
+  pitchRateController.SetSampleTime(3);
+  yawRateController.SetSampleTime(3);
+}//end of initPID Fcn
+
+/*
+   In this fuction we configure mpu6050 and calculate offsets i.e calibration
+*/
+void initMPU6050() {
+  configureMPU();
+  calculateOffsets();
+}//end of initMPU6050 Fcn
+
+void calculateOffsets() {
+  float gyroTotalValX = 0, gyroTotalValY = 0;
+  for (int i = 0 ; i < noOfSamplesForOffset ; i++) {
+    readMPU();
+    gyroTotalValX = gyroTotalValX + rotX;
+    gyroTotalValY = gyroTotalValY + rotY;
+    Serial.println("..........");
+  }//end of for loop
+  gyroOffsetValX = gyroTotalValX / noOfSamplesForOffset;
+  gyroOffsetValY = gyroTotalValY / noOfSamplesForOffset;
+}//end of calculateGyroOffsets Fcn
+
+
+void readMPU() {
+  Wire.beginTransmission(MPU6050_ADDR);
+  Wire.write(ACCR_READ_START_ADDR);  // starting with register 0x3B (ACCEL_XOUT_H)
+  Wire.endTransmission(false);
+  Wire.requestFrom(MPU6050_ADDR, 14, true);
+  while(Wire.available() < 14) {
+    //wait until data is available
+    Serial.println(F("MPU6050 waiting"));
+  }
+  accX = Wire.read() << 8 | Wire.read();
+  accY = Wire.read() << 8 | Wire.read();
+  accZ = Wire.read() << 8 | Wire.read();
+  tmp = Wire.read() << 8 | Wire.read();
+  gyroX = Wire.read() << 8 | Wire.read();
+  gyroY = Wire.read() << 8 | Wire.read();
+  gyroZ = Wire.read() << 8 | Wire.read();
+
+  //apply scale factor for gyro reading
+  rotX = gyroX / GYRO_SENSITIVITY_SCALE_FACTOR;
+  rotY = gyroY / GYRO_SENSITIVITY_SCALE_FACTOR;
+
+}//end of readGyroX Fcn
+
+/*
+ * This function will apply complementary filer to gyro angular rates and
+ * assign them as PID inputs
+ */
+void calculateRotationRates(){
+  //apply the offset
+  rotX = rotX - gyroOffsetValX;
+  rotY = rotY - gyroOffsetValY;
+  
+  //complemenrary filter for gyro readings
+  pidPitchRateIn = (pidPitchRateIn * 0.8) + (rotX * 0.2);
+  pidRollRateIn = (pidRollRateIn * 0.8) + (rotY * 0.2);
+}//end of calculateRotationRates Fcn
+
+//get register values from mpu6050 and calculate angles based on complementary filter
+void updateAnglesFromMPU() {
+  readMPU();
+  calculateRotationRates();
+}//end of updateAnglesFromMPU Fcn
+
+void configureMPU() {
+  //Power Register
+  Wire.beginTransmission(MPU6050_ADDR);
+  Wire.write(PWR_REG_ADDR);//Access the power register
+  Wire.write(0b00000000);//check datasheet
+  Wire.endTransmission();
+
+  //Gyro Config
+  Wire.beginTransmission(MPU6050_ADDR);
+  Wire.write(ACCR_CONFIG_REG_ADDR);
+  Wire.write(ACCR_CONFIG_REG_VALUE);//check data sheet for more info
+  Wire.endTransmission();
+
+  //Accr Config
+  Wire.beginTransmission(MPU6050_ADDR);
+  Wire.write(GYRO_CONFIG_REG_ADDR);
+  Wire.write(GYRO_CONFIG_REG_VALUE);//check datasheet for more info
+  Wire.endTransmission();
+}//end of setUpMPU Fcn
+
+
+void computePID() {
+  //input updated in updateAngles Fcn
+  //update SetPoint according to throttle
+  setPointUpdate();
+  rollRateController.Compute();
+  pitchRateController.Compute();
+  yawRateController.Compute();
+}//end of computePID Fcn
+
+void sendBTOutput() {
+  if (millis() - btDataStartMillis > DATA_INTERVAL) {
+    btDataStartMillis = millis();
+    Serial.print(F("y")); Serial.print(pidYawRateIn);Serial.print(F(">"));
+    Serial.print(F("p")); Serial.print(pidPitchRateIn); Serial.print(F(">")); 
+    Serial.print(F("r")); Serial.print(pidRollRateIn); Serial.print(F(">")); 
+    Serial.print(F("ps")); Serial.print(pidPitchRateSetPoint); Serial.print(F(">"));
+    Serial.print(F("rs")); Serial.print(pidRollRateSetPoint); Serial.print(F(">"));
+    Serial.print(F("ys")); Serial.print(pidYawRateSetPoint); Serial.print(F(">"));
+    Serial.print(F("po")); Serial.print(pidPitchRateOut); Serial.print(F(">"));
+    Serial.print(F("ro")); Serial.print(pidRollRateOut); Serial.print(F(">"));
+    Serial.print(F("yo")); Serial.print(pidYawRateOut);Serial.print(F(">"));
+    Serial.print(F("m0-")); Serial.print(m0Value); Serial.print(F(">"));
+    Serial.print(F("m1-")); Serial.print(m1Value); Serial.print(F(">"));
+    Serial.print(F("m2-")); Serial.print(m2Value); Serial.print(F(">"));
+    Serial.print(F("m3-")); Serial.print(m3Value); Serial.print(F(">"));
+    Serial.print(F("c0")); Serial.print(pwmDuration[0]); Serial.print(F(">"));
+    Serial.print(F("c1")); Serial.print(pwmDuration[1]); Serial.print(F(">"));
+    Serial.print(F("c2")); Serial.print(pwmDuration[2]); Serial.print(F(">"));
+    Serial.print(F("c3")); Serial.print(pwmDuration[3]); Serial.print(F(">"));
+    Serial.println("");
+    
+  }//end of IF
+}//end of sendBTOutput Fcn
+
+void setup() {
+  pinMode(13,OUTPUT);
+  digitalWrite(13,LOW); //used to indicate FC is ready
+  initReceiver();
+  Serial.begin(38400); //HC-05 is using hardware serial, 38400 is HC-05 default baud rate
+  initMPU6050();
+  initPID();
+  initializeMotors();
+  prevTime = millis(); //used to calculate dt for gyro integration
+  loopTimer = micros();//used to keep track of loop time
+  digitalWrite(13,HIGH);//FC is Ready
+}//end of setup Fcn
+
+void loop() {
+  updateAnglesFromMPU();
+  if(armMotors == true){
+    computePID();
+    updateMotors();
+  }//end of armMotors
+
+#ifdef DEBUG
+  sendBTOutput();
+ #endif
+}//end of loop Fcn
