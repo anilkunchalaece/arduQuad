@@ -109,17 +109,13 @@ const byte ACCR_READ_START_ADDR = 0x3B;
 const float radToDegreeConvert = 180.0 / PI;
 
 int16_t accX,accY,accZ,gyroX,gyroY,gyroZ,tmp;//used to store the data from MPU6050 registers
-double rotX,rotY; //used to store the angular rotation from gyro
-double angleX,angleY;//used to store the angle calculated from accr
-double compAngleX,compAngleY;//for complimentary filter
-
+double rotX,rotY,rotZ; //used to store the angular rotation from gyro
 
 unsigned long prevTime = 0, currentTime=0; //used to calculate the dt for gyro integration
 unsigned long loopTimer=0, now=0, difference=0; //used to calculate the loop execution time
 
 //gyro offset variables
-float gyroOffsetValX = 0, gyroOffsetValY = 0;
-float accrOffsetValX = 0, accrOffsetValY = 0; //do we need offset for accr ?
+float gyroOffsetValX = 0, gyroOffsetValY = 0, gyroOffsetValZ = 0;
 
 const int noOfSamplesForOffset = 400;
 
@@ -137,13 +133,13 @@ const byte rxCh[] = {ch0,ch1,ch2,ch3};
 const byte noOfChannels = sizeof(rxCh);
 
 //PID Constants
-const double pitchRatePGain = 0.10;
+const double pitchRatePGain = 0.008;
 const double pitchRateIGain = 0.00;
-const double pitchRateDGain = 0.02;
+const double pitchRateDGain = 0.000;
 
 const double rollRatePGain = pitchRatePGain;
 const double rollRateIGain = pitchRateIGain;
-const double rollRateDGain = rollRateDGain;
+const double rollRateDGain = pitchRateDGain;
 
 const double yawRatePGain = 0.0;
 const double yawRateIGain = 0.0;
@@ -210,10 +206,10 @@ void initReceiver() {
 void updateMotors() {
 
   int throttle = pwmDuration[2];
-  m0Value = throttle + pidPitchRateOut + pidRollRateOut; //- pidYawRateOut;
-  m1Value = throttle - pidPitchRateOut + pidRollRateOut; //+ pidYawRateOut;
-  m2Value = throttle - pidPitchRateOut - pidRollRateOut; //- pidYawRateOut;
-  m3Value = throttle + pidPitchRateOut - pidRollRateOut; //+ pidYawRateOut;
+  m0Value = throttle + pidPitchRateOut + pidRollRateOut; //- pidYawRateOut; //rightFront
+  m1Value = throttle - pidPitchRateOut + pidRollRateOut; //+ pidYawRateOut; //rightRear
+  m2Value = throttle - pidPitchRateOut - pidRollRateOut; //- pidYawRateOut; //leftRear
+  m3Value = throttle + pidPitchRateOut - pidRollRateOut; //+ pidYawRateOut; //leftFront
 
   //dont send values more than motorMaxValue - ESC may get into trouble
   if (m0Value > motorMaxValue) m0Value = motorMaxValue;
@@ -299,15 +295,17 @@ void initMPU6050() {
 }//end of initMPU6050 Fcn
 
 void calculateOffsets() {
-  float gyroTotalValX = 0, gyroTotalValY = 0;
+  float gyroTotalValX = 0, gyroTotalValY = 0, gyroTotalValZ = 0;
   for (int i = 0 ; i < noOfSamplesForOffset ; i++) {
     readMPU();
     gyroTotalValX = gyroTotalValX + rotX;
     gyroTotalValY = gyroTotalValY + rotY;
+    gyroTotalValZ = gyroTotalValZ + rotZ;
     Serial.println("..........");
   }//end of for loop
   gyroOffsetValX = gyroTotalValX / noOfSamplesForOffset;
   gyroOffsetValY = gyroTotalValY / noOfSamplesForOffset;
+  gyroOffsetValZ = gyroTotalValZ / noOfSamplesForOffset;
 }//end of calculateGyroOffsets Fcn
 
 
@@ -331,6 +329,7 @@ void readMPU() {
   //apply scale factor for gyro reading
   rotX = gyroX / GYRO_SENSITIVITY_SCALE_FACTOR;
   rotY = gyroY / GYRO_SENSITIVITY_SCALE_FACTOR;
+  rotZ = gyroZ / GYRO_SENSITIVITY_SCALE_FACTOR;
 
 }//end of readGyroX Fcn
 
@@ -342,10 +341,11 @@ void calculateRotationRates(){
   //apply the offset
   rotX = rotX - gyroOffsetValX;
   rotY = rotY - gyroOffsetValY;
-  
+  rotZ = rotZ - gyroOffsetValZ;
   //complemenrary filter for gyro readings
   pidPitchRateIn = (pidPitchRateIn * 0.8) + (rotX * 0.2);
   pidRollRateIn = (pidRollRateIn * 0.8) + (rotY * 0.2);
+  pidYawRateIn = (pidYawRateIn * 0.8)+ (rotZ * 0.2);
 }//end of calculateRotationRates Fcn
 
 //get register values from mpu6050 and calculate angles based on complementary filter
