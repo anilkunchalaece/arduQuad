@@ -52,7 +52,7 @@
 #include<math.h>
 
  //used to send debug info via bluetooth
- #define DEBUG
+ //#define DEBUG
 
  #define DATA_INTERVAL 200 //send debug info every 200 milli seconds
  unsigned long btDataStartMillis;
@@ -72,6 +72,7 @@
 #define throttleMinValue 1200
 #define throttleMaxValue 1800
 
+#define motorMinValue 1200
 #define motorMaxValue 1800
 
 #define ch0Max 1800
@@ -96,14 +97,14 @@
 const float GYRO_SENSITIVITY_SCALE_FACTOR = 65.5; //for 500 degrees/sec full scale 
 
 //MPU6050 I2C address
-const byte MPU6050_ADDR = 0b1101000;
+const int MPU6050_ADDR = 0b1101000;
 //MPU6050 Register Addresses
-const byte PWR_REG_ADDR = 0x6B;
-const byte GYRO_CONFIG_REG_ADDR = 0x1B;
-const byte GYRO_CONFIG_REG_VALUE = 0x08;//for 500 degrees / sec
-const byte ACCR_CONFIG_REG_ADDR = 0x1C;
-const byte ACCR_CONFIG_REG_VALUE = 0x10; //for +/- 8g
-const byte ACCR_READ_START_ADDR = 0x3B;
+const int PWR_REG_ADDR = 0x6B;
+const int GYRO_CONFIG_REG_ADDR = 0x1B;
+const int GYRO_CONFIG_REG_VALUE = 0x08;//for 500 degrees / sec
+const int ACCR_CONFIG_REG_ADDR = 0x1C;
+const int ACCR_CONFIG_REG_VALUE = 0x10; //for +/- 8g
+const int ACCR_READ_START_ADDR = 0x3B;
 
 //variables used for angular rate and angle calculations
 const float radToDegreeConvert = 180.0 / PI;
@@ -133,27 +134,29 @@ const byte rxCh[] = {ch0,ch1,ch2,ch3};
 const byte noOfChannels = sizeof(rxCh);
 
 //PID Constants
-const double pitchRatePGain = 0.008;
-const double pitchRateIGain = 0.00;
-const double pitchRateDGain = 0.000;
+const double pitchRatePGain = 1.3;
+const double pitchRateIGain = 0.05;
+const double pitchRateDGain = 15;
 
-const double rollRatePGain = pitchRatePGain;
-const double rollRateIGain = pitchRateIGain;
-const double rollRateDGain = pitchRateDGain;
+const double rollRatePGain = 1.3;
+const double rollRateIGain = 0.05;
+const double rollRateDGain = 15;
 
-const double yawRatePGain = 0.0;
-const double yawRateIGain = 0.0;
+const double yawRatePGain = 3.0;
+const double yawRateIGain = 0.02;
 const double yawRateDGain = 0.0;
+ 
+const int pidOutMax = 400;
 
 // PID variables
 double pidPitchRateIn,pidPitchRateOut,pidPitchRateSetPoint;
 double pidRollRateIn,pidRollRateOut,pidRollRateSetPoint;
 double pidYawRateIn,pidYawRateOut,pidYawRateSetPoint;
 
-//PID Instances
-PID pitchRateController (&pidPitchRateIn,&pidPitchRateOut,&pidPitchRateSetPoint,pitchRatePGain,pitchRateIGain,pitchRateDGain,DIRECT);
-PID rollRateController (&pidRollRateIn,&pidRollRateOut,&pidRollRateSetPoint,rollRatePGain,rollRateIGain,rollRateDGain,DIRECT);
-PID yawRateController (&pidYawRateIn,&pidYawRateOut,&pidYawRateSetPoint,yawRatePGain,yawRateIGain,yawRateDGain,DIRECT);
+double pitchError,rollError,yawError;
+double pitchPrevError,rollPrevError,yawPrevError;
+double pitchErrorSum,rollErrorSum,yawErrorSum;//for integral coefficient
+double pitchErrorDelta,rollErrorDelta,yawErrorDelta; //for differntial coeffcient
 
 //variables to store the motor values calculated using pid and throttle
 int m0Value, m1Value,m2Value,m3Value;
@@ -183,7 +186,7 @@ ISR(PCINT0_vect) {
   }
 
   //DISARM Motors
-  if (pwmDuration[2] < 1250 && pwmDuration[0] > 1700) {
+  if (pwmDuration[2] < 1250 && pwmDuration[0] > 1600) {
     //Throttle Min and Roll Max
     armMotors = false;
   }
@@ -206,16 +209,23 @@ void initReceiver() {
 void updateMotors() {
 
   int throttle = pwmDuration[2];
-  m0Value = throttle + pidPitchRateOut + pidRollRateOut; //- pidYawRateOut; //rightFront
-  m1Value = throttle - pidPitchRateOut + pidRollRateOut; //+ pidYawRateOut; //rightRear
-  m2Value = throttle - pidPitchRateOut - pidRollRateOut; //- pidYawRateOut; //leftRear
-  m3Value = throttle + pidPitchRateOut - pidRollRateOut; //+ pidYawRateOut; //leftFront
+  m0Value = throttle - pidPitchRateOut + pidRollRateOut + pidYawRateOut; //rightFront
+  m1Value = throttle + pidPitchRateOut + pidRollRateOut - pidYawRateOut; //rightRear
+  m2Value = throttle + pidPitchRateOut - pidRollRateOut + pidYawRateOut; //leftRear
+  m3Value = throttle - pidPitchRateOut - pidRollRateOut - pidYawRateOut; //leftFront
 
   //dont send values more than motorMaxValue - ESC may get into trouble
   if (m0Value > motorMaxValue) m0Value = motorMaxValue;
   if (m1Value > motorMaxValue) m1Value = motorMaxValue;
   if (m2Value > motorMaxValue) m2Value = motorMaxValue;
   if (m3Value > motorMaxValue) m3Value = motorMaxValue;
+
+
+  //dont send values less than motorMinValue - Keep motors running
+  if(m0Value < motorMinValue) m0Value = motorMinValue + 20;
+  if(m1Value < motorMinValue) m1Value = motorMinValue + 20;
+  if(m2Value < motorMinValue) m2Value = motorMinValue + 20;
+  if(m3Value < motorMinValue) m3Value = motorMinValue + 20;
 
     // Refresh rate is 250Hz: send ESC pulses every 4000µs
     while ((now = micros()) - loopTimer < 4000);
@@ -256,6 +266,7 @@ void initializeMotors() {
 void setPointUpdate() {
   pidRollRateSetPoint = 0;
   pidPitchRateSetPoint = 0;
+  pidYawRateSetPoint = 0;
   if (pwmDuration[0] > chMid - 10  && pwmDuration[0] < chMid + 10) {
     pidRollRateSetPoint = 0;
   } else {
@@ -271,19 +282,19 @@ void setPointUpdate() {
     pidPitchRateSetPoint = map(pwmDuration[1], ch1Min, ch1Max, pitchRateMin, pitchRateMax);
     pidPitchRateSetPoint = constrain(pidPitchRateSetPoint, pitchRateMin, pitchRateMax);
   }
+
+  if (pwmDuration[3] > chMid - 10 && pwmDuration[3] < chMid + 10) {
+    pidYawRateSetPoint = 0;
+  } else {
+    pidYawRateSetPoint = map(pwmDuration[3], ch3Min, ch3Max, yawRateMin, yawRateMax);
+    pidYawRateSetPoint = constrain(pidYawRateSetPoint, yawRateMin, yawRateMax);
+  }
+  
 }//end of SetPointUpdate Fcn
 
 
 void initPID() {
-  rollRateController.SetOutputLimits(-300,300);
-  pitchRateController.SetOutputLimits(-300,300);
-  yawRateController.SetOutputLimits(-300,300);
-  rollRateController.SetMode(AUTOMATIC);
-  pitchRateController.SetMode(AUTOMATIC);
-  yawRateController.SetMode(AUTOMATIC);
-  rollRateController.SetSampleTime(3); //sample time every 3 milliseconds cause main loop runs every 4 milli sec
-  pitchRateController.SetSampleTime(3);
-  yawRateController.SetSampleTime(3);
+  //nothing to initialize here
 }//end of initPID Fcn
 
 /*
@@ -301,7 +312,7 @@ void calculateOffsets() {
     gyroTotalValX = gyroTotalValX + rotX;
     gyroTotalValY = gyroTotalValY + rotY;
     gyroTotalValZ = gyroTotalValZ + rotZ;
-    Serial.println("..........");
+//    Serial.println("..........");
   }//end of for loop
   gyroOffsetValX = gyroTotalValX / noOfSamplesForOffset;
   gyroOffsetValY = gyroTotalValY / noOfSamplesForOffset;
@@ -379,10 +390,37 @@ void computePID() {
   //input updated in updateAngles Fcn
   //update SetPoint according to throttle
   setPointUpdate();
-  rollRateController.Compute();
-  pitchRateController.Compute();
-  yawRateController.Compute();
+
+  //calculate errors
+  pitchError = pidPitchRateIn - pidPitchRateSetPoint;
+  rollError = pidRollRateIn - pidRollRateSetPoint;
+  yawError = pidYawRateIn - pidYawRateSetPoint;
+
+  //calculate sum of errors
+  pitchErrorSum = pitchError + pitchPrevError;
+  rollErrorSum = rollError + rollPrevError;
+  yawErrorSum = yawError + yawPrevError;
+
+  //calculate delta of errors
+  pitchErrorDelta = pitchError - pitchPrevError;
+  rollErrorDelta = rollError - rollPrevError;
+  yawErrorDelta = yawError - yawPrevError;
+
+  //save current error as prev error for next iteration
+  pitchPrevError = pitchError;
+  rollPrevError = rollError;
+  yawPrevError = yawError;
+
+  //PID Calculation
+  pidPitchRateOut = (pitchError * pitchRatePGain) + (pitchErrorSum * pitchRateIGain) + (pitchErrorDelta * pitchRateDGain);
+  pidRollRateOut = (rollError * rollRatePGain) + (rollErrorSum * rollRateIGain) + (rollErrorDelta * rollRateDGain);
+  pidYawRateOut = (yawError * yawRatePGain) + (yawErrorSum * yawRateIGain) + (yawErrorDelta * yawRateDGain);
+
 }//end of computePID Fcn
+
+void resetPID(){
+  
+}//end of resetPID Fcn
 
 void sendBTOutput() {
   if (millis() - btDataStartMillis > DATA_INTERVAL) {
@@ -413,7 +451,9 @@ void setup() {
   pinMode(13,OUTPUT);
   digitalWrite(13,LOW); //used to indicate FC is ready
   initReceiver();
+  #ifdef DEBUG
   Serial.begin(38400); //HC-05 is using hardware serial, 38400 is HC-05 default baud rate
+  #endif
   initMPU6050();
   initPID();
   initializeMotors();
