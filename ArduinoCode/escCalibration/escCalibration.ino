@@ -11,14 +11,11 @@
 //variables used in pinChange ISR
 volatile boolean recvPCInt = false;
 
-#define throttleMinValue 1200
-#define throttleMaxValue 1800
-
 //variables to store the motor values calculated using pid and throttle
 int m0Value, m1Value, m2Value, m3Value;
 
 //used to store the pwm duration
-volatile unsigned long pwmDuration[4];
+volatile int pwmDuration[4];
 volatile unsigned long pwmStart[4];
 
 //pinDeclaration for Rx
@@ -35,7 +32,7 @@ volatile byte presentPortState[4];
 #define m2 6
 #define m3 7
 
-unsigned long prevTime = 0, currentTime=0,loopTimer=0; //to calculate dt for gyro integration
+unsigned long loopTimer=0; //to calculate dt for gyro integration
 
 unsigned long now = 0, difference = 0;
 
@@ -88,17 +85,15 @@ void setup() {
   // put your setup code here, to run once:
   initReceiver();
   initializeMotors();
-    prevTime = millis(); //used to calculate dt for gyro integration
-  loopTimer = micros() ; // used to calculate the loop timer [do we need it?]
 
-Serial.begin(9600);
-Serial.println("send a to start calibration");
-Serial.println("send b to stop calibration");
+  Serial.begin(9600);
+  Serial.println("send a to start calibration");
+  Serial.println("send b to stop calibration");
   
 }
 
 void loop() {
-
+loopTimer = micros() ; // used to calculate the loop timer [do we need it?]
 if (Serial.available()){
   char recvChar = Serial.read();
   
