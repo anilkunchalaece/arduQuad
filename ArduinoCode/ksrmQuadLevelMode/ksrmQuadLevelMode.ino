@@ -57,7 +57,7 @@
 #include<math.h>
 
  //used to send debug info via bluetooth
- //#define DEBUG
+ #define DEBUG
 
  #define DATA_INTERVAL 200 //send debug info every 200 milli seconds
  unsigned long btDataStartMillis;
@@ -147,11 +147,11 @@ const byte noOfChannels = sizeof(rxCh);
 //PID Constants
 const float pitchRatePGain = 1.3;
 const float pitchRateIGain = 0.04;
-const float pitchRateDGain = 15;
+const float pitchRateDGain = 18.0;
 
 const float rollRatePGain = 1.3;
 const float rollRateIGain = 0.04;
-const float rollRateDGain = 15;
+const float rollRateDGain = 18.0;
 
 const float yawRatePGain = 3.0;
 const float yawRateIGain = 0.02;
@@ -221,10 +221,10 @@ void initReceiver() {
 void updateMotors() {
 
   int throttle = pwmDuration[2];
-  m0Value = throttle - pidPitchRateOut + pidRollRateOut + pidYawRateOut; //rightFront
-  m1Value = throttle + pidPitchRateOut + pidRollRateOut - pidYawRateOut; //rightRear
-  m2Value = throttle + pidPitchRateOut - pidRollRateOut + pidYawRateOut; //leftRear
-  m3Value = throttle - pidPitchRateOut - pidRollRateOut - pidYawRateOut; //leftFront
+  m0Value = throttle - pidPitchRateOut - pidRollRateOut + pidYawRateOut; //rightFront
+  m1Value = throttle + pidPitchRateOut - pidRollRateOut - pidYawRateOut; //rightRear
+  m2Value = throttle + pidPitchRateOut + pidRollRateOut + pidYawRateOut; //leftRear
+  m3Value = throttle - pidPitchRateOut + pidRollRateOut - pidYawRateOut; //leftFront
 
   //dont send values more than motorMaxValue - ESC may get into trouble
   if (m0Value > motorMaxValue) m0Value = motorMaxValue;
@@ -309,8 +309,6 @@ if(pwmDuration[1] > 1508){
   pidPitchRateSetPoint = pwmDuration[1] - 1508;
 }else if(pwmDuration[1] < 1492){
   pidPitchRateSetPoint = pwmDuration[1] - 1492;
-}else{
-  pidPitchRateSetPoint = 0.0;
 }
 
 
@@ -359,8 +357,8 @@ void calculateOffsets() {
     gyroTotalValY = gyroTotalValY + rotY;
     gyroTotalValZ = gyroTotalValZ + rotZ;
     
-    accAngleX = atan(accX/sqrt(pow(accY,2) + pow(accZ,2))) * radToDegreeConvert;
-    accAngleY = atan(accY/sqrt(pow(accX,2) + pow(accZ,2))) * radToDegreeConvert;
+    accAngleY = atan(accX/sqrt(pow(accY,2) + pow(accZ,2))) * radToDegreeConvert;
+    accAngleX = atan(accY/sqrt(pow(accX,2) + pow(accZ,2))) * radToDegreeConvert;
     accrTotalValX = accrTotalValX + accAngleX;
     accrTotalValY = accrTotalValY + accAngleY;
     
@@ -375,8 +373,8 @@ void calculateOffsets() {
   
   //read again to get current values
   readMPU();
-  accAngleX = atan(accX/sqrt(pow(accY,2) + pow(accZ,2))) * radToDegreeConvert;
-  accAngleY = atan(accY/sqrt(pow(accX,2) + pow(accZ,2))) * radToDegreeConvert;
+  accAngleY = atan(accX/sqrt(pow(accY,2) + pow(accZ,2))) * radToDegreeConvert;
+  accAngleX = atan(accY/sqrt(pow(accX,2) + pow(accZ,2))) * radToDegreeConvert;
 
   //apply offsets to accr values
   accAngleX = accAngleX - accrOffsetValX;
@@ -440,8 +438,8 @@ void calculateRotationRates(){
 
 void calculateAngles(){
   //angles from accr
-  accAngleX = atan(accX/sqrt(pow(accY,2) + pow(accZ,2)))*radToDegreeConvert;
-  accAngleY = atan(accY/sqrt(pow(accX,2) + pow(accZ,2)))*radToDegreeConvert;
+  accAngleY = atan(accX/sqrt(pow(accY,2) + pow(accZ,2)))*radToDegreeConvert;
+  accAngleX = atan(accY/sqrt(pow(accX,2) + pow(accZ,2)))*radToDegreeConvert;
 
   //apply offsets to accr values
   accAngleX = accAngleX - accrOffsetValX;
@@ -451,16 +449,16 @@ void calculateAngles(){
   //double dt = 0.004
 
   //The Mighty Complementary filter
-   compAngleX = 0.99 * (compAngleX + rotX * 0.004) + 0.01 * accAngleX; 
-   compAngleY = 0.99 * (compAngleY + rotY * 0.004) + 0.01 * accAngleY;
+   compAngleX = 0.98 * (compAngleX + rotX * 0.004) + 0.02 * accAngleX; 
+   compAngleY = 0.98 * (compAngleY + rotY * 0.004) + 0.02 * accAngleY;
 
   // assigning pitch and roll
-  pitchAngle = compAngleY;
-  rollAngle = compAngleX;
+  pitchAngle = compAngleX;
+  rollAngle = compAngleY;
 
-   //if imu yawed convert roll to pitch
-   pitchAngle = pitchAngle - rollAngle * sin(rotZ * ((3.142 * PI) / 180));
-   rollAngle = rollAngle + pitchAngle * sin(rotZ * ((3.142 * PI) / 180));
+//   //if imu yawed convert roll to pitch 0.004 = 1/250
+   pitchAngle = pitchAngle - rollAngle * sin(rotZ * 0.004 *  ((3.142 * PI) / 180));
+   rollAngle = rollAngle + pitchAngle * sin(rotZ * 0.004 * ((3.142 * PI) / 180));
 }//end of calculateAngles Fcn
 
 
@@ -568,7 +566,7 @@ void setup() {
   digitalWrite(13,LOW); //used to indicate FC is ready
   initReceiver();
   #ifdef DEBUG
-  Serial.begin(38400); //HC-05 is using hardware serial, 38400 is HC-05 default baud rate
+  Serial.begin(115200); //HC-05 is using hardware serial, 38400 is HC-05 default baud rate
   btDataStartMillis = millis();
   Serial.println("DEBUG mode ON");
   #endif
