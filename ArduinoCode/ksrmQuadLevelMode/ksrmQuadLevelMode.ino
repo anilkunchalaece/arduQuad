@@ -57,7 +57,7 @@
 #include<math.h>
 
  //used to send debug info via bluetooth
- #define DEBUG
+ //#define DEBUG
 
  #define DATA_INTERVAL 200 //send debug info every 200 milli seconds
  unsigned long btDataStartMillis;
@@ -144,14 +144,14 @@ volatile byte presentPortState[4];
 const byte rxCh[] = {ch0,ch1,ch2,ch3};
 const byte noOfChannels = sizeof(rxCh);
 
-//PID Constants
-const float pitchRatePGain = 1.3;
-const float pitchRateIGain = 0.04;
-const float pitchRateDGain = 18.0;
+//PID Constants //0.5
+const float pitchRatePGain = 0.0;
+const float pitchRateIGain = 0.0;
+const float pitchRateDGain = 0.0;
 
-const float rollRatePGain = 1.3;
-const float rollRateIGain = 0.04;
-const float rollRateDGain = 18.0;
+const float rollRatePGain = 0.2;
+const float rollRateIGain = 0.0;
+const float rollRateDGain = 0.0;
 
 const float yawRatePGain = 3.0;
 const float yawRateIGain = 0.02;
