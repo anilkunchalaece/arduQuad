@@ -125,13 +125,13 @@ const byte rxCh[] = {ch0, ch1, ch2, ch3};
 const byte noOfChannels = sizeof(rxCh);
 
 //PID Constants //0.5
-const float pitchRatePGain = 0.0;
+const float pitchRatePGain = 1.5;
 const float pitchRateIGain = 0.0;
-const float pitchRateDGain = 0.0;
+const float pitchRateDGain = 1.0;
 
-const float rollRatePGain = 0.2;
+const float rollRatePGain = 1.5;
 const float rollRateIGain = 0.0;
-const float rollRateDGain = 0.0;
+const float rollRateDGain = 1.0;
 
 const float yawRatePGain = 0.0;
 const float yawRateIGain = 0.0;
