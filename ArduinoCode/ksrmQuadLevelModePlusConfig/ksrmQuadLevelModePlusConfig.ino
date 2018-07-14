@@ -52,12 +52,11 @@
 // If you are planning for more serial devices go for arduino Mega
 // I use blutooth to get flight parameters - it will be used with hardware serial
 
-#include<PID_v1.h>
 #include<Wire.h>
 #include<math.h>
 
 //used to send debug info via bluetooth
-#define DEBUG
+//#define DEBUG
 
 #define DATA_INTERVAL 200 //send debug info every 200 milli seconds
 unsigned long btDataStartMillis;
@@ -126,11 +125,11 @@ const byte rxCh[] = {ch0, ch1, ch2, ch3};
 const byte noOfChannels = sizeof(rxCh);
 
 //PID Constants //0.5
-const float pitchRatePGain = 1.0;
+const float pitchRatePGain = 0.0;
 const float pitchRateIGain = 0.0;
 const float pitchRateDGain = 0.0;
 
-const float rollRatePGain = 0.0;
+const float rollRatePGain = 0.2;
 const float rollRateIGain = 0.0;
 const float rollRateDGain = 0.0;
 
@@ -385,10 +384,16 @@ void calculateRotationRates() {
   rotX = rotX - gyroOffsetValX;
   rotY = rotY - gyroOffsetValY;
   rotZ = rotZ - gyroOffsetValZ;
+
+  rotY = rotY * -1;
   //complemenrary filter for gyro readings
   pidPitchRateIn = (pidPitchRateIn * 0.8) + (rotX * 0.2);
   pidRollRateIn = (pidRollRateIn * 0.8) + (rotY * 0.2);
   pidYawRateIn = (pidYawRateIn * 0.8) + (rotZ * 0.2);
+
+  //reverse the direction for roll - i dont know why should we do that - yet
+  //pidRollRateIn = pidRollRateIn * -1;
+  
 }//end of calculateRotationRates Fcn
 
 /*
