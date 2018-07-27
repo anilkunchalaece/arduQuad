@@ -18,7 +18,7 @@
                 5 (cw)
                   |
                   |
-    (ccw) 6 ------|------ (ccw)4
+    (ccw) 6 ------|------ 4(ccw)
                   |
                   |
                 7 (cw)
@@ -112,7 +112,7 @@ float accrOffsetValX = 0, accrOffsetValY = 0;
 const int noOfSamplesForOffset = 400;
 
 //variables used in pinChange ISR
-volatile boolean armMotors = false; //used to arm and disarm quad
+volatile boolean armMotors = false, justArmed = false; //used to arm and disarm quad
 volatile int pwmDuration[4]; //used to store pwm duration
 volatile unsigned long pwmStart[4];
 
@@ -125,15 +125,15 @@ const byte rxCh[] = {ch0, ch1, ch2, ch3};
 const byte noOfChannels = sizeof(rxCh);
 
 //PID Constants //0.5
-const float pitchRatePGain = 1.5;
-const float pitchRateIGain = 0.0;
-const float pitchRateDGain = 1.0;
+const float pitchRatePGain = 2.0;
+const float pitchRateIGain = 0.02;
+const float pitchRateDGain = 8.0;
 
-const float rollRatePGain = 1.5;
-const float rollRateIGain = 0.0;
-const float rollRateDGain = 1.0;
+const float rollRatePGain = 2.0;
+const float rollRateIGain = 0.02;
+const float rollRateDGain = 8.0;
 
-const float yawRatePGain = 0.0;
+const float yawRatePGain = 3.0;
 const float yawRateIGain = 0.0;
 const float yawRateDGain = 0.0;
 
@@ -173,6 +173,9 @@ ISR(PCINT0_vect) {
   //ARM motors
   if (pwmDuration[2] < 1250 && pwmDuration[3] > 1700) {
     //Throttle Min And Yaw Max
+    if (armMotors == false){
+      justArmed = true;
+    }
     armMotors = true;
   }
 
@@ -203,7 +206,7 @@ void updateMotors() {
   m0Value = throttle - pidRollRateOut + pidYawRateOut; //right
   m1Value = throttle  - pidPitchRateOut - pidYawRateOut; //top
   m2Value = throttle + pidRollRateOut + pidYawRateOut; //left
-  m3Value = throttle + pidPitchRateOut  - pidYawRateOut; //bottom
+  m3Value = throttle + pidPitchRateOut - pidYawRateOut; //bottom
 
   //dont send values more than motorMaxValue - ESC may get into trouble
   if (m0Value > motorMaxValue) m0Value = motorMaxValue;
@@ -393,7 +396,7 @@ void calculateRotationRates() {
 
   //reverse the direction for roll - i dont know why should we do that - yet
   //pidRollRateIn = pidRollRateIn * -1;
-  
+
 }//end of calculateRotationRates Fcn
 
 /*
@@ -406,8 +409,8 @@ void calculateAngles() {
   accAngleX = atan(accY / sqrt(pow(accX, 2) + pow(accZ, 2))) * radToDegreeConvert;
 
   //apply offsets to accr values
-  accAngleX = accAngleX - accrOffsetValX;
-  accAngleY = accAngleY - accrOffsetValY;
+//  accAngleX = accAngleX - accrOffsetValX;
+//  accAngleY = accAngleY - accrOffsetValY;
 
 
   //double dt = 0.004 = 1/250
@@ -422,8 +425,8 @@ void calculateAngles() {
 
   //   //if imu yawed convert roll to pitch //0.004 = 1/250
   //copied from ymfc-al code
-  pitchAngle = pitchAngle - rollAngle * sin(rotZ * 0.004 *  ((3.142 * PI) / 180));
-  rollAngle = rollAngle + pitchAngle * sin(rotZ * 0.004 * ((3.142 * PI) / 180));
+  pitchAngle = pitchAngle - rollAngle * sin(rotZ * 0.004 *  (3.142 / 180));
+  rollAngle = rollAngle + pitchAngle * sin(rotZ * 0.004 * (3.142 / 180));
 }//end of calculateAngles Fcn
 
 
@@ -497,7 +500,12 @@ void computePID() {
 }//end of computePID Fcn
 
 void resetPID() {
-
+  pitchPrevError = 0.0;
+  rollPrevError = 0.0;
+  yawPrevError = 0.0;
+  pitchErrorDelta = 0.0;
+  rollErrorDelta = 0.0;
+  yawErrorDelta = 0.0;
 }//end of resetPID Fcn
 
 void sendBTOutput() {
@@ -545,6 +553,11 @@ void setup() {
 
 void loop() {
   updateAnglesFromMPU();
+  //reset the pid when first time armed
+  if (justArmed == true){
+    resetPID();
+    justArmed = false;
+  }
   if (armMotors == true) {
     computePID();
     updateMotors();
